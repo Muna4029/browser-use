@@ -39,7 +39,7 @@ class Registry(Generic[Context]):
 		self.telemetry = ProductTelemetry()
 		self.exclude_actions = exclude_actions if exclude_actions is not None else []
 
-	def _get_special_param_types(self) -> dict[str, type | None]:
+	def _get_special_param_types(self) -> dict[str, Any]:
 		"""Get the expected types for special parameters from SpecialActionParameters"""
 		# Manually define the expected types to avoid issues with Optional handling.
 		# we should try to reduce this list to 0 if possible, give as few standardized objects to all the actions
@@ -509,15 +509,11 @@ class Registry(Generic[Context]):
 
 		for name, action in available_actions.items():
 			# Create an individual model for each action that contains only one field
+			field_definitions = {name: (action.param_model, Field(description=action.description))}
 			individual_model = create_model(
 				f'{name.title().replace("_", "")}ActionModel',
 				__base__=ActionModel,
-				**{
-					name: (
-						action.param_model,
-						Field(description=action.description),
-					)
-				},
+				**field_definitions,  # type: ignore[reportCallIssue]
 			)
 			individual_action_models.append(individual_model)
 
@@ -531,7 +527,7 @@ class Registry(Generic[Context]):
 			result_model = individual_action_models[0]
 		else:
 			# Create a Union type using RootModel that properly delegates ActionModel methods
-			union_type = Union[tuple(individual_action_models)]
+			union_type = Union[*individual_action_models]
 
 			class ActionModelUnion(RootModel[union_type]):  # type: ignore
 				"""Union of all available action models that maintains ActionModel interface"""
