@@ -25,8 +25,8 @@ dependencies = [
     "langchain>=0.3.25",
     "markdownify==1.1.0",
     "mem0ai>=0.1.106",
-    "patchright>=1.52.5",
-    "playwright>=1.52.0",
+    "patchright>=1.52.5; sys_platform != 'win32' or platform_machine != 'x86_64'",
+    "playwright>=1.52.0; sys_platform != 'win32' or platform_machine != 'x86_64'",
     "posthog>=3.7.0",
     "psutil>=7.0.0",
     "pydantic>=2.11.5",
@@ -162,7 +162,7 @@ required-environments = [
     "sys_platform == 'linux' and platform_machine == 'x86_64'",
     "sys_platform == 'linux' and platform_machine == 'aarch64'",
     # "sys_platform == 'linux' and platform_machine == 'arm64'",  # no pytorch wheels available yet
-    "sys_platform == 'win32' and platform_machine == 'x86_64'",
+    # "sys_platform == 'win32' and platform_machine == 'x86_64'",  # playwright/patchright have no Windows x86_64 wheels
     # "sys_platform == 'win32' and platform_machine == 'arm64'",  # no pytorch wheels available yet
 ]
 dev-dependencies = [
