@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterable
 from typing import overload
 
 from anthropic.types import (
@@ -275,7 +276,7 @@ class AnthropicMessageSerializer:
 		return cleaned_messages
 
 	@staticmethod
-	def serialize_messages(messages: list[BaseMessage]) -> tuple[list[MessageParam], list[TextBlockParam] | str | None]:
+	def serialize_messages(messages: list[BaseMessage]) -> tuple[list[MessageParam], Iterable[TextBlockParam] | str | None]:
 		"""Serialize a list of messages, extracting any system message.
 
 		Returns:
