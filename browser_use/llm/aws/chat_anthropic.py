@@ -10,6 +10,7 @@ from anthropic import (
 	AsyncAnthropicBedrock,
 	RateLimitError,
 )
+from anthropic._types import Omit
 from anthropic.types import CacheControlEphemeralParam, Message, ToolParam
 from anthropic.types.text_block import TextBlock
 from anthropic.types.tool_choice_tool_param import ToolChoiceToolParam
@@ -160,7 +161,7 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
+					system=system_prompt if system_prompt else Omit(),
 					**self._get_client_params_for_invoke(),
 				)
 
@@ -203,7 +204,7 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 					model=self.model,
 					messages=anthropic_messages,
 					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
+					system=system_prompt if system_prompt else Omit(),
 					tool_choice=tool_choice,
 					**self._get_client_params_for_invoke(),
 				)
