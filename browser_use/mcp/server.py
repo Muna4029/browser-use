@@ -190,189 +190,44 @@ class BrowserUseServer:
 		self._setup_handlers()
 
 	def _setup_handlers(self):
-		"""Setup MCP server handlers."""
+		"""Setup MCP server handlers using add_request_handler."""
+		from typing import Any
 
-		@self.server.list_tools()
-		async def handle_list_tools() -> list[types.Tool]:
+		from mcp.server.context import ServerRequestContext
+		from pydantic import BaseModel
+
+		# Define request parameters for list_tools
+		class ListToolsParams(BaseModel):
+			pass
+
+		# Define request parameters for call_tool
+		class CallToolParams(BaseModel):
+			name: str
+			arguments: dict[str, Any] = {}
+
+		# Handler for list_tools
+		async def handle_list_tools(params: ListToolsParams, context: ServerRequestContext):
 			"""List all available browser-use tools."""
-			return [
-				# Agent tools
-				# Direct browser control tools
-				types.Tool(
-					name='browser_navigate',
-					description='Navigate to a URL in the browser',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'url': {'type': 'string', 'description': 'The URL to navigate to'},
-							'new_tab': {'type': 'boolean', 'description': 'Whether to open in a new tab', 'default': False},
-						},
-						'required': ['url'],
-					},
-				),
-				types.Tool(
-					name='browser_click',
-					description='Click an element on the page by its index',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'index': {
-								'type': 'integer',
-								'description': 'The index of the link or element to click (from browser_get_state)',
-							},
-							'new_tab': {
-								'type': 'boolean',
-								'description': 'Whether to open any resulting navigation in a new tab',
-								'default': False,
-							},
-						},
-						'required': ['index'],
-					},
-				),
-				types.Tool(
-					name='browser_type',
-					description='Type text into an input field',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'index': {
-								'type': 'integer',
-								'description': 'The index of the input element (from browser_get_state)',
-							},
-							'text': {'type': 'string', 'description': 'The text to type'},
-						},
-						'required': ['index', 'text'],
-					},
-				),
-				types.Tool(
-					name='browser_get_state',
-					description='Get the current state of the page including all interactive elements',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'include_screenshot': {
-								'type': 'boolean',
-								'description': 'Whether to include a screenshot of the current page',
-								'default': False,
-							}
-						},
-					},
-				),
-				types.Tool(
-					name='browser_extract_content',
-					description='Extract structured content from the current page based on a query',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'query': {'type': 'string', 'description': 'What information to extract from the page'},
-							'extract_links': {
-								'type': 'boolean',
-								'description': 'Whether to include links in the extraction',
-								'default': False,
-							},
-						},
-						'required': ['query'],
-					},
-				),
-				types.Tool(
-					name='browser_scroll',
-					description='Scroll the page',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'direction': {
-								'type': 'string',
-								'enum': ['up', 'down'],
-								'description': 'Direction to scroll',
-								'default': 'down',
-							}
-						},
-					},
-				),
-				types.Tool(
-					name='browser_go_back',
-					description='Go back to the previous page',
-					inputSchema={'type': 'object', 'properties': {}},
-				),
-				# Tab management
-				types.Tool(
-					name='browser_list_tabs', description='List all open tabs', inputSchema={'type': 'object', 'properties': {}}
-				),
-				types.Tool(
-					name='browser_switch_tab',
-					description='Switch to a different tab',
-					inputSchema={
-						'type': 'object',
-						'properties': {'tab_index': {'type': 'integer', 'description': 'Index of the tab to switch to'}},
-						'required': ['tab_index'],
-					},
-				),
-				types.Tool(
-					name='browser_close_tab',
-					description='Close a tab',
-					inputSchema={
-						'type': 'object',
-						'properties': {'tab_index': {'type': 'integer', 'description': 'Index of the tab to close'}},
-						'required': ['tab_index'],
-					},
-				),
-				# types.Tool(
-				# 	name="browser_close",
-				# 	description="Close the browser session",
-				# 	inputSchema={
-				# 		"type": "object",
-				# 		"properties": {}
-				# 	}
-				# ),
-				types.Tool(
-					name='retry_with_browser_use_agent',
-					description='Retry a task using the browser-use agent. Only use this as a last resort if you fail to interact with a page multiple times.',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'task': {
-								'type': 'string',
-								'description': 'The high-level goal and detailed step-by-step description of the task the AI browser agent needs to attempt, along with any relevant data needed to complete the task and info about previous attempts.',
-							},
-							'max_steps': {
-								'type': 'integer',
-								'description': 'Maximum number of steps the agent can take',
-								'default': 100,
-							},
-							'model': {
-								'type': 'string',
-								'description': 'LLM model to use (e.g., gpt-4o, claude-3-opus-20240229)',
-								'default': 'gpt-4o',
-							},
-							'allowed_domains': {
-								'type': 'array',
-								'items': {'type': 'string'},
-								'description': 'List of domains the agent is allowed to visit (security feature)',
-								'default': [],
-							},
-							'use_vision': {
-								'type': 'boolean',
-								'description': 'Whether to use vision capabilities (screenshots) for the agent',
-								'default': True,
-							},
-						},
-						'required': ['task'],
-					},
-				),
-			]
+			return types.ListToolsResult(tools=self._get_tools_list())
 
-		@self.server.call_tool()
-		async def handle_call_tool(name: str, arguments: dict[str, Any] | None) -> list[types.TextContent]:
+		# Handler for call_tool
+		async def handle_call_tool(params: CallToolParams, context: ServerRequestContext):
 			"""Handle tool execution."""
 			start_time = time.time()
 			error_msg = None
 			try:
-				result = await self._execute_tool(name, arguments or {})
-				return [types.TextContent(type='text', text=result)]
+				result = await self._execute_tool(params.name, params.arguments or {})
+				return types.CallToolResult(
+					content=[types.TextContent(type='text', text=result)],
+					is_error=False
+				)
 			except Exception as e:
 				error_msg = str(e)
 				logger.error(f'Tool execution failed: {e}', exc_info=True)
-				return [types.TextContent(type='text', text=f'Error: {str(e)}')]
+				return types.CallToolResult(
+					content=[types.TextContent(type='text', text=f'Error: {str(e)}')],
+					is_error=True
+				)
 			finally:
 				# Capture telemetry for tool calls
 				duration = time.time() - start_time
@@ -380,11 +235,183 @@ class BrowserUseServer:
 					MCPServerTelemetryEvent(
 						version=get_browser_use_version(),
 						action='tool_call',
-						tool_name=name,
+						tool_name=params.name,
 						duration_seconds=duration,
 						error_message=error_msg,
 					)
 				)
+
+		# Register the handlers
+		self.server.add_request_handler('tools/list', ListToolsParams, handle_list_tools)
+		self.server.add_request_handler('tools/call', CallToolParams, handle_call_tool)
+
+	def _get_tools_list(self) -> list[types.Tool]:
+		"""Return the list of available tools."""
+		return [
+			# Agent tools
+			# Direct browser control tools
+			types.Tool(
+				name='browser_navigate',
+				description='Navigate to a URL in the browser',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'url': {'type': 'string', 'description': 'The URL to navigate to'},
+						'new_tab': {'type': 'boolean', 'description': 'Whether to open in a new tab', 'default': False},
+					},
+					'required': ['url'],
+				},
+			),
+			types.Tool(
+				name='browser_click',
+				description='Click an element on the page by its index',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'index': {
+							'type': 'integer',
+							'description': 'The index of the link or element to click (from browser_get_state)',
+						},
+						'new_tab': {
+							'type': 'boolean',
+							'description': 'Whether to open any resulting navigation in a new tab',
+							'default': False,
+						},
+					},
+					'required': ['index'],
+				},
+			),
+			types.Tool(
+				name='browser_type',
+				description='Type text into an input field',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'index': {
+							'type': 'integer',
+							'description': 'The index of the input element (from browser_get_state)',
+						},
+						'text': {'type': 'string', 'description': 'The text to type'},
+					},
+					'required': ['index', 'text'],
+				},
+			),
+			types.Tool(
+				name='browser_get_state',
+				description='Get the current state of the page including all interactive elements',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'include_screenshot': {
+							'type': 'boolean',
+							'description': 'Whether to include a screenshot of the current page',
+							'default': False,
+						}
+					},
+				},
+			),
+			types.Tool(
+				name='browser_extract_content',
+				description='Extract structured content from the current page based on a query',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'query': {'type': 'string', 'description': 'What information to extract from the page'},
+						'extract_links': {
+							'type': 'boolean',
+							'description': 'Whether to include links in the extraction',
+							'default': False,
+						},
+					},
+					'required': ['query'],
+				},
+			),
+			types.Tool(
+				name='browser_scroll',
+				description='Scroll the page',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'direction': {
+							'type': 'string',
+							'enum': ['up', 'down'],
+							'description': 'Direction to scroll',
+							'default': 'down',
+						}
+					},
+				},
+			),
+			types.Tool(
+				name='browser_go_back',
+				description='Go back to the previous page',
+				input_schema={'type': 'object', 'properties': {}},
+			),
+			# Tab management
+			types.Tool(
+				name='browser_list_tabs', description='List all open tabs', input_schema={'type': 'object', 'properties': {}}
+			),
+			types.Tool(
+				name='browser_switch_tab',
+				description='Switch to a different tab',
+				input_schema={
+					'type': 'object',
+					'properties': {'tab_index': {'type': 'integer', 'description': 'Index of the tab to switch to'}},
+					'required': ['tab_index'],
+				},
+			),
+			types.Tool(
+				name='browser_close_tab',
+				description='Close a tab',
+				input_schema={
+					'type': 'object',
+					'properties': {'tab_index': {'type': 'integer', 'description': 'Index of the tab to close'}},
+					'required': ['tab_index'],
+				},
+			),
+			# types.Tool(
+			# 	name="browser_close",
+			# 	description="Close the browser session",
+			# 	input_schema={
+			# 		"type": "object",
+			# 		"properties": {}
+			# 	}
+			# ),
+			types.Tool(
+				name='retry_with_browser_use_agent',
+				description='Retry a task using the browser-use agent. Only use this as a last resort if you fail to interact with a page multiple times.',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'task': {
+							'type': 'string',
+							'description': 'The high-level goal and detailed step-by-step description of the task the AI browser agent needs to attempt, along with any relevant data needed to complete the task and info about previous attempts.',
+						},
+						'max_steps': {
+							'type': 'integer',
+							'description': 'Maximum number of steps the agent can take',
+							'default': 100,
+						},
+						'model': {
+							'type': 'string',
+							'description': 'LLM model to use (e.g., gpt-4o, claude-3-opus-20240229)',
+							'default': 'gpt-4o',
+						},
+						'allowed_domains': {
+							'type': 'array',
+							'items': {'type': 'string'},
+							'description': 'List of domains the agent is allowed to visit (security feature)',
+							'default': [],
+						},
+						'use_vision': {
+							'type': 'boolean',
+							'description': 'Whether to use vision capabilities (screenshots) for the agent',
+							'default': True,
+						},
+					},
+					'required': ['task'],
+				},
+			),
+		]
 
 	async def _execute_tool(self, tool_name: str, arguments: dict[str, Any]) -> str:
 		"""Execute a browser-use tool."""

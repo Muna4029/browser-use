@@ -26,139 +26,52 @@ class MockMCPServer:
 		self._setup_handlers()
 
 	def _setup_handlers(self):
-		"""Setup MCP server handlers."""
+		"""Setup MCP server handlers using add_request_handler."""
+		from typing import Any
 
-		@self.server.list_tools()
-		async def handle_list_tools() -> list[types.Tool]:
+		from mcp.server.context import ServerRequestContext
+		from pydantic import BaseModel
+
+		# Define request parameters for list_tools
+		class ListToolsParams(BaseModel):
+			pass
+
+		# Define request parameters for call_tool
+		class CallToolParams(BaseModel):
+			name: str
+			arguments: dict[str, Any] = {}
+
+		# Handler for list_tools
+		async def handle_list_tools(params: ListToolsParams, context: ServerRequestContext):
 			"""List available test tools."""
-			return [
-				types.Tool(
-					name='count_to_n',
-					description='Count from 1 to n and return the numbers',
-					inputSchema={
-						'type': 'object',
-						'properties': {'n': {'type': 'integer', 'description': 'Number to count to'}},
-						'required': ['n'],
-					},
-				),
-				types.Tool(
-					name='echo_message',
-					description='Echo back a message with a prefix',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'message': {'type': 'string', 'description': 'Message to echo'},
-							'prefix': {'type': 'string', 'description': 'Prefix to add', 'default': 'Echo:'},
-						},
-						'required': ['message'],
-					},
-				),
-				types.Tool(
-					name='get_test_data',
-					description='Get some test data as JSON',
-					inputSchema={'type': 'object', 'properties': {}},
-				),
-				types.Tool(
-					name='process_trace_update',
-					description='Process a cognitive trace update with nested object parameter',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'trace': {
-								'type': 'object',
-								'properties': {
-									'recent_actions': {
-										'type': 'array',
-										'items': {'type': 'string'},
-										'description': 'List of recent action names',
-									},
-									'current_context': {
-										'type': 'string',
-										'description': 'Current environment context or state',
-									},
-									'goal': {
-										'type': 'string',
-										'description': 'Current goal being pursued',
-									},
-								},
-								'required': ['recent_actions', 'goal'],
-								'additionalProperties': False,
-							},
-							'window_size': {
-								'type': 'number',
-								'description': 'Size of the monitoring window',
-								'default': 10,
-							},
-						},
-						'required': ['trace'],
-						'additionalProperties': False,
-					},
-				),
-				types.Tool(
-					name='process_array_data',
-					description='Process various array types',
-					inputSchema={
-						'type': 'object',
-						'properties': {
-							'string_list': {
-								'type': 'array',
-								'items': {'type': 'string'},
-								'description': 'List of strings',
-							},
-							'number_list': {
-								'type': 'array',
-								'items': {'type': 'number'},
-								'description': 'List of numbers',
-							},
-							'config_list': {
-								'type': 'array',
-								'items': {
-									'type': 'object',
-									'properties': {
-										'name': {'type': 'string'},
-										'value': {'type': 'integer'},
-										'enabled': {'type': 'boolean', 'default': True},
-									},
-									'required': ['name', 'value'],
-								},
-								'description': 'List of configuration objects',
-							},
-							'simple_array': {
-								'type': 'array',
-								'description': 'Array without item type specified',
-							},
-						},
-						'required': ['string_list'],
-					},
-				),
-			]
+			return types.ListToolsResult(tools=self._get_tools_list())
 
-		@self.server.call_tool()
-		async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+		# Handler for call_tool
+		async def handle_call_tool(params: CallToolParams, context: ServerRequestContext):
 			"""Handle tool execution."""
 			# Record the call
-			self.call_history.append({'tool': name, 'arguments': arguments or {}})
+			self.call_history.append({'tool': params.name, 'arguments': params.arguments or {}})
 
-			if name == 'count_to_n':
-				assert arguments is not None
-				n = arguments.get('n', 5)
+			if params.name == 'count_to_n':
+				assert params.arguments is not None
+				n = params.arguments.get('n', 5)
 				numbers = ', '.join(str(i) for i in range(1, n + 1))
 				result = f'Counted to {n}: {numbers}'
 
-			elif name == 'echo_message':
-				assert arguments is not None
-				message = arguments.get('message', '')
-				prefix = arguments.get('prefix', 'Echo:')
+			elif params.name == 'echo_message':
+				assert params.arguments is not None
+				message = params.arguments.get('message', '')
+				prefix = params.arguments.get('prefix', 'Echo:')
 				result = f'{prefix} {message}'
 
-			elif name == 'get_test_data':
+			elif params.name == 'get_test_data':
 				data = {'status': 'success', 'items': ['apple', 'banana', 'cherry'], 'count': 3}
 				result = json.dumps(data, indent=2)
 
-			elif name == 'process_trace_update':
-				assert arguments is not None
-				trace = arguments.get('trace', {})
-				window_size = arguments.get('window_size', 10)
+			elif params.name == 'process_trace_update':
+				assert params.arguments is not None
+				trace = params.arguments.get('trace', {})
+				window_size = params.arguments.get('window_size', 10)
 
 				recent_actions = trace.get('recent_actions', [])
 				current_context = trace.get('current_context', 'unknown')
@@ -166,20 +79,132 @@ class MockMCPServer:
 
 				result = f'Processed trace update: {len(recent_actions)} actions, goal: {goal}, context: {current_context}, window: {window_size}'
 
-			elif name == 'process_array_data':
-				assert arguments is not None
-				string_list = arguments.get('string_list', [])
-				number_list = arguments.get('number_list', [])
-				config_list = arguments.get('config_list', [])
-				simple_array = arguments.get('simple_array', [])
+			elif params.name == 'process_array_data':
+				assert params.arguments is not None
+				string_list = params.arguments.get('string_list', [])
+				number_list = params.arguments.get('number_list', [])
+				config_list = params.arguments.get('config_list', [])
+				simple_array = params.arguments.get('simple_array', [])
 
 				config_summary = f'{len(config_list)} configs' if config_list else 'no configs'
 				result = f'Processed arrays: strings={len(string_list)}, numbers={len(number_list)}, {config_summary}, simple={len(simple_array)}'
 
 			else:
-				result = f'Unknown tool: {name}'
+				result = f'Unknown tool: {params.name}'
 
-			return [types.TextContent(type='text', text=result)]
+			return types.CallToolResult(
+				content=[types.TextContent(type='text', text=result)],
+				is_error=False
+			)
+
+		# Register the handlers
+		self.server.add_request_handler('tools/list', ListToolsParams, handle_list_tools)
+		self.server.add_request_handler('tools/call', CallToolParams, handle_call_tool)
+
+	def _get_tools_list(self) -> list[types.Tool]:
+		"""Return the list of available tools."""
+		return [
+			types.Tool(
+				name='count_to_n',
+				description='Count from 1 to n and return the numbers',
+				input_schema={
+					'type': 'object',
+					'properties': {'n': {'type': 'integer', 'description': 'Number to count to'}},
+					'required': ['n'],
+				},
+			),
+			types.Tool(
+				name='echo_message',
+				description='Echo back a message with a prefix',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'message': {'type': 'string', 'description': 'Message to echo'},
+						'prefix': {'type': 'string', 'description': 'Prefix to add', 'default': 'Echo:'},
+					},
+					'required': ['message'],
+				},
+			),
+			types.Tool(
+				name='get_test_data',
+				description='Get some test data as JSON',
+				input_schema={'type': 'object', 'properties': {}},
+			),
+			types.Tool(
+				name='process_trace_update',
+				description='Process a cognitive trace update with nested object parameter',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'trace': {
+							'type': 'object',
+							'properties': {
+								'recent_actions': {
+									'type': 'array',
+									'items': {'type': 'string'},
+									'description': 'List of recent action names',
+								},
+								'current_context': {
+									'type': 'string',
+									'description': 'Current environment context or state',
+								},
+								'goal': {
+									'type': 'string',
+									'description': 'Current goal being pursued',
+								},
+							},
+							'required': ['recent_actions', 'goal'],
+							'additionalProperties': False,
+						},
+						'window_size': {
+							'type': 'number',
+							'description': 'Size of the monitoring window',
+							'default': 10,
+						},
+					},
+					'required': ['trace'],
+					'additionalProperties': False,
+				},
+			),
+			types.Tool(
+				name='process_array_data',
+				description='Process various array types',
+				input_schema={
+					'type': 'object',
+					'properties': {
+						'string_list': {
+							'type': 'array',
+							'items': {'type': 'string'},
+							'description': 'List of strings',
+						},
+						'number_list': {
+							'type': 'array',
+							'items': {'type': 'number'},
+							'description': 'List of numbers',
+						},
+						'config_list': {
+							'type': 'array',
+							'items': {
+								'type': 'object',
+								'properties': {
+									'name': {'type': 'string'},
+									'value': {'type': 'integer'},
+									'enabled': {'type': 'boolean', 'default': True},
+								},
+								'required': ['name', 'value'],
+							},
+							'description': 'List of configuration objects',
+						},
+						'simple_array': {
+							'type': 'array',
+							'description': 'Array without item type specified',
+						},
+					},
+					'required': ['string_list'],
+				},
+			),
+		]
+
 
 	async def run(self):
 		"""Run the MCP server."""
