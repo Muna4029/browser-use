@@ -30,7 +30,7 @@ from browser_use.browser import BrowserSession
 from browser_use.llm import ChatOpenAI
 
 try:
-	from lmnr import Laminar
+	from lmnr import Laminar  # type: ignore[import]
 
 	Laminar.initialize(project_api_key=os.getenv('LMNR_PROJECT_API_KEY'))
 except ImportError:
@@ -199,7 +199,7 @@ async def openai_cua_fallback(params: OpenAICUAAction, browser_session: BrowserS
 			raise Exception('No computer calls found in CUA response')
 
 		action = computer_call.action
-		print(f'🎬 Executing CUA action: {action.type} - {action}')
+		print(f'🎬 Executing CUA action: {action.type} - {action}')  # type: ignore[union-attr]
 
 		action_result = await handle_model_action(page, action)
 		await asyncio.sleep(0.1)

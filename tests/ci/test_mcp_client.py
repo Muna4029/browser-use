@@ -11,7 +11,7 @@ import mcp.types as types
 import pytest
 from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
-from pytest_httpserver import HTTPServer
+from pytest_httpserver import HTTPServer  # type: ignore[import]
 
 from browser_use import ActionResult, Agent, BrowserProfile, BrowserSession, Controller
 from browser_use.mcp.client import MCPClient
@@ -28,14 +28,14 @@ class MockMCPServer:
 	def _setup_handlers(self):
 		"""Setup MCP server handlers."""
 
-		@self.server.list_tools()
+		@self.server.list_tools()  # type: ignore[attr-defined]
 		async def handle_list_tools() -> list[types.Tool]:
 			"""List available test tools."""
 			return [
 				types.Tool(
 					name='count_to_n',
 					description='Count from 1 to n and return the numbers',
-					inputSchema={
+					input_schema={
 						'type': 'object',
 						'properties': {'n': {'type': 'integer', 'description': 'Number to count to'}},
 						'required': ['n'],
@@ -44,7 +44,7 @@ class MockMCPServer:
 				types.Tool(
 					name='echo_message',
 					description='Echo back a message with a prefix',
-					inputSchema={
+					input_schema={
 						'type': 'object',
 						'properties': {
 							'message': {'type': 'string', 'description': 'Message to echo'},
@@ -56,12 +56,12 @@ class MockMCPServer:
 				types.Tool(
 					name='get_test_data',
 					description='Get some test data as JSON',
-					inputSchema={'type': 'object', 'properties': {}},
+					input_schema={'type': 'object', 'properties': {}},
 				),
 				types.Tool(
 					name='process_trace_update',
 					description='Process a cognitive trace update with nested object parameter',
-					inputSchema={
+					input_schema={
 						'type': 'object',
 						'properties': {
 							'trace': {
@@ -97,7 +97,7 @@ class MockMCPServer:
 				types.Tool(
 					name='process_array_data',
 					description='Process various array types',
-					inputSchema={
+					input_schema={
 						'type': 'object',
 						'properties': {
 							'string_list': {
@@ -133,7 +133,7 @@ class MockMCPServer:
 				),
 			]
 
-		@self.server.call_tool()
+		@self.server.call_tool()  # type: ignore[attr-defined]
 		async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
 			"""Handle tool execution."""
 			# Record the call
@@ -296,7 +296,7 @@ async def test_mcp_tools_with_agent(test_mcp_server_script, httpserver: HTTPServ
 		await mcp_client.register_to_controller(controller)
 
 		# Import create_mock_llm from conftest
-		from tests.ci.conftest import create_mock_llm
+		from tests.ci.conftest import create_mock_llm  # type: ignore[import]
 
 		# Create mock LLM with specific actions
 		actions = [
@@ -565,7 +565,7 @@ async def test_agent_with_multiple_mcp_servers(test_mcp_server_script, httpserve
 		await mcp_server2.register_to_controller(controller, prefix='data_', tool_filter=['echo_message', 'get_test_data'])
 
 		# Import create_mock_llm from conftest
-		from tests.ci.conftest import create_mock_llm
+		from tests.ci.conftest import create_mock_llm  # type: ignore[import]
 
 		# Create mock LLM with actions using tools from both servers
 		actions = [
