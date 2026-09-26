@@ -12,9 +12,11 @@ Accessibility Tree Playground for browser-use
 Run with: python browser_use/dom/tests/test_accessibility_playground.py
 """
 
+from __future__ import annotations
+
 import asyncio
 
-from browser_use.browser.types import async_playwright
+from browser_use.browser.types import PlaywrightPage, async_playwright
 
 # Change this to any site you want to test
 
@@ -70,7 +72,7 @@ def flatten_ax_tree(node, lines):
 async def get_ax_tree(TARGET_URL):
 	async with async_playwright() as p:
 		browser = await p.chromium.launch(headless=True)
-		page = await browser.new_page()
+		page: PlaywrightPage = await browser.new_page()
 		print(f'Navigating to {TARGET_URL}')
 		await page.goto(TARGET_URL, wait_until='domcontentloaded')
 

@@ -26,6 +26,7 @@ Page = PatchrightPage | PlaywrightPage
 ElementHandle = PatchrightElementHandle | PlaywrightElementHandle
 FrameLocator = PatchrightFrameLocator | PlaywrightFrameLocator
 Playwright = Playwright
+PlaywrightPage = PlaywrightPage
 Patchright = Patchright
 PlaywrightOrPatchright = Patchright | Playwright
 TargetClosedError = PatchrightTargetClosedError | PlaywrightTargetClosedError
