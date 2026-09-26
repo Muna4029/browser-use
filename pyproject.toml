@@ -28,6 +28,7 @@ dependencies = [
     "patchright>=1.52.5",
     "playwright>=1.52.0",
     "posthog>=3.7.0",
+    "Pillow>=10.3.0",
     "psutil>=7.0.0",
     "pydantic>=2.11.5",
     "pyobjc>=11.0; platform_system == 'darwin'",
@@ -116,6 +117,7 @@ skip-magic-trailing-comma = false
 
 [tool.pyright]
 typeCheckingMode = "basic"
+useLibraryCodeForTypes = true
 exclude = ["tests/old/", ".venv/", ".git/", "__pycache__/"]
 
 

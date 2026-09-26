@@ -4,12 +4,10 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 
-@dataclass
 class BaseTelemetryEvent(ABC):
 	@property
 	@abstractmethod
-	def name(self) -> str:
-		pass
+	def name(self) -> str: ...
 
 	@property
 	def properties(self) -> dict[str, Any]:
