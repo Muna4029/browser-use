@@ -58,7 +58,8 @@ cli = [
     "textual>=3.2.0",
 ]
 aws = [
-    "boto3>=1.38.45"
+    "boto3>=1.38.45",
+    "anthropic[bedrock]>=0.54.0"
 ]
 examples = [
     # botocore: only needed for Bedrock Claude boto3 examples/models/bedrock_claude.py

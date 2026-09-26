@@ -154,7 +154,10 @@ def create_browserbase_session() -> str:
 	try:
 		from browserbase import Browserbase
 	except ImportError:
-		raise ImportError('browserbase package is required for Browserbase functionality. Install it with: pip install browserbase')
+		raise ImportError(
+			'browserbase package is required for Browserbase functionality. '
+			'Install it with: pip install browserbase'
+		)
 
 	try:
 		bb = Browserbase(api_key=BROWSERBASE_API_KEY)
