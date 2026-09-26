@@ -1,5 +1,5 @@
 import json
-from typing import overload
+from typing import Iterable, overload
 
 from anthropic.types import (
 	Base64ImageSourceParam,
@@ -87,7 +87,7 @@ class AnthropicMessageSerializer:
 	@staticmethod
 	def _serialize_content_to_str(
 		content: str | list[ContentPartTextParam], use_cache: bool = False
-	) -> list[TextBlockParam] | str:
+	) -> Iterable[TextBlockParam] | str:
 		"""Serialize content to a string."""
 		cache_control = AnthropicMessageSerializer._serialize_cache_control(use_cache)
 
@@ -275,7 +275,7 @@ class AnthropicMessageSerializer:
 		return cleaned_messages
 
 	@staticmethod
-	def serialize_messages(messages: list[BaseMessage]) -> tuple[list[MessageParam], list[TextBlockParam] | str | None]:
+	def serialize_messages(messages: list[BaseMessage]) -> tuple[list[MessageParam], str | Iterable[TextBlockParam] | None]:
 		"""Serialize a list of messages, extracting any system message.
 
 		Returns:
@@ -303,7 +303,7 @@ class AnthropicMessageSerializer:
 			serialized_messages.append(AnthropicMessageSerializer.serialize(message))
 
 		# Serialize system message
-		serialized_system_message: list[TextBlockParam] | str | None = None
+		serialized_system_message: str | Iterable[TextBlockParam] | None = None
 		if system_message:
 			serialized_system_message = AnthropicMessageSerializer._serialize_content_to_str(
 				system_message.content, use_cache=system_message.cache

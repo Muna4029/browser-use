@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from browser_use.agent.views import ActionModel, ActionResult
 from browser_use.browser import BrowserSession
-from browser_use.browser.types import ElementHandle, Page
+from browser_use.browser.types import ElementHandle, Page, PlaywrightPage
 from browser_use.controller.registry.service import Registry
 from browser_use.controller.views import (
 	ClickElementAction,
@@ -470,7 +470,7 @@ Explain the content of the page and that the requested information is not availa
 			'Get the accessibility tree of the page in the format "role name" with the number_of_elements to return',
 		)
 		async def get_ax_tree(number_of_elements: int, page: Page):
-			node = await page.accessibility.snapshot(interesting_only=True)
+			node = await cast(PlaywrightPage, page).accessibility.snapshot(interesting_only=True)
 
 			def flatten_ax_tree(node, lines):
 				if not node:

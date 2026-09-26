@@ -3,10 +3,12 @@
 import asyncio
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 from browser_use.filesystem.file_system import (
+	BaseFile,
 	DEFAULT_FILE_SYSTEM_PATH,
 	INVALID_FILENAME_ERROR_MESSAGE,
 	FileSystem,
@@ -428,10 +430,8 @@ class TestFileSystem:
 		file_obj = fs2.get_file('custom.txt')
 		assert file_obj is not None
 		assert file_obj.content == 'Custom content'
-		assert (
-			fs2.get_file('extracted_content_0.md').content is not None
-			and fs2.get_file('extracted_content_0.md').content == 'Extracted data'
-		)
+		extracted_file = cast(BaseFile, fs2.get_file('extracted_content_0.md'))
+		assert extracted_file.content == 'Extracted data'
 
 		# Verify files exist on disk
 		assert (fs2.data_dir / 'results.md').exists()
