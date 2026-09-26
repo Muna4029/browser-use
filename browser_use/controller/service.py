@@ -476,8 +476,8 @@ Explain the content of the page and that the requested information is not availa
 		@self.registry.action(
 			'Get the accessibility tree of the page in the format "role name" with the number_of_elements to return',
 		)
-		async def get_ax_tree(number_of_elements: int, page: Page):
-			node = await page.accessibility.snapshot(interesting_only=True)
+		async def get_ax_tree(number_of_elements: int, page: Page):  # type: ignore
+			node = await page.accessibility.snapshot(interesting_only=True)  # type: ignore[reportAttributeAccessIssue]
 
 			def flatten_ax_tree(node, lines):
 				if not node:

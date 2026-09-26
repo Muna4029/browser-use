@@ -39,7 +39,7 @@ class Registry(Generic[Context]):
 		self.telemetry = ProductTelemetry()
 		self.exclude_actions = exclude_actions if exclude_actions is not None else []
 
-	def _get_special_param_types(self) -> dict[str, type | None]:
+	def _get_special_param_types(self) -> dict[str, Any]:
 		"""Get the expected types for special parameters from SpecialActionParameters"""
 		# Manually define the expected types to avoid issues with Optional handling.
 		# we should try to reduce this list to 0 if possible, give as few standardized objects to all the actions
@@ -50,7 +50,7 @@ class Registry(Generic[Context]):
 			'browser_session': BrowserSession,
 			'browser': BrowserSession,  # legacy name
 			'browser_context': BrowserSession,  # legacy name
-			'page': Page,
+			'page': Page,  # type: ignore
 			'page_extraction_llm': BaseChatModel,
 			'available_file_paths': list,
 			'has_sensitive_data': bool,
@@ -509,16 +509,16 @@ class Registry(Generic[Context]):
 
 		for name, action in available_actions.items():
 			# Create an individual model for each action that contains only one field
-			individual_model = create_model(
+			individual_model = create_model(  # type: ignore[reportCallIssue,reportArgumentType]
 				f'{name.title().replace("_", "")}ActionModel',
 				__base__=ActionModel,
-				**{
+				**{  # type: ignore[arg-type]
 					name: (
 						action.param_model,
 						Field(description=action.description),
 					)
 				},
-			)
+			)  # type: ignore[reportCallIssue]
 			individual_action_models.append(individual_model)
 
 		# If no actions available, return empty ActionModel
@@ -531,26 +531,29 @@ class Registry(Generic[Context]):
 			result_model = individual_action_models[0]
 		else:
 			# Create a Union type using RootModel that properly delegates ActionModel methods
-			union_type = Union[tuple(individual_action_models)]
+			union_type = Union[tuple(individual_action_models)]  # type: ignore
 
 			class ActionModelUnion(RootModel[union_type]):  # type: ignore
 				"""Union of all available action models that maintains ActionModel interface"""
 
-				def get_index(self) -> int | None:
+				def get_index(self) -> int | None:  # type: ignore[override]
 					"""Delegate get_index to the underlying action model"""
-					if hasattr(self.root, 'get_index'):
-						return self.root.get_index()
+					root = self.root  # type: ignore
+					if hasattr(root, 'get_index'):
+						return root.get_index()  # type: ignore
 					return None
 
-				def set_index(self, index: int):
+				def set_index(self, index: int):  # type: ignore[override]
 					"""Delegate set_index to the underlying action model"""
-					if hasattr(self.root, 'set_index'):
-						self.root.set_index(index)
+					root = self.root  # type: ignore
+					if hasattr(root, 'set_index'):
+						root.set_index(index)  # type: ignore
 
-				def model_dump(self, **kwargs):
+				def model_dump(self, **kwargs):  # type: ignore[override]
 					"""Delegate model_dump to the underlying action model"""
-					if hasattr(self.root, 'model_dump'):
-						return self.root.model_dump(**kwargs)
+					root = self.root  # type: ignore
+					if hasattr(root, 'model_dump'):
+						return root.model_dump(**kwargs)  # type: ignore
 					return super().model_dump(**kwargs)
 
 			# Set the name for better debugging
