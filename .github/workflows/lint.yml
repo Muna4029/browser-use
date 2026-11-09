@@ -32,4 +32,4 @@ jobs:
       with:
         enable-cache: true
     - run: uv sync --dev --all-extras
-    - run: run: npx pyright@latest --venvpath .venv
+    - run: npx pyright@latest --venvpath .venv
