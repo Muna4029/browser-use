@@ -32,4 +32,4 @@ jobs:
       with:
         enable-cache: true
     - run: uv sync --dev --all-extras
-    - run: PYRIGHT_PYTHON_FORCE_VERSION=latest uv run pyright
+    - run: npx pyright@latest
