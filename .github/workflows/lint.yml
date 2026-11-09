@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v6
+    - uses: astral-sh/setup-uv@v5
       with:
         enable-cache: true
     - run: uv run ruff check --no-fix --select PLE
@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v6
+    - uses: astral-sh/setup-uv@v5
       with:
         enable-cache: true
     - run: uv sync --dev --all-extras
@@ -28,9 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v6
+    - uses: astral-sh/setup-uv@v5
       with:
         enable-cache: true
     - run: uv sync --dev --all-extras
-    - run: PYRIGHT_PYTHON_FORCE_VERSION=latest uv run pyright
-
+    - run: uv run pyright
