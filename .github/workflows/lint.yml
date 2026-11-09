@@ -32,4 +32,4 @@ jobs:
       with:
         enable-cache: true
     - run: uv sync --dev --all-extras
-    - run: npx pyright@latest --venvpath .venv
+    - run: uv run --with pyright==1.1.390 pyright
