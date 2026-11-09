@@ -30,4 +30,4 @@ jobs:
     - uses: astral-sh/setup-uv@v6
       with:
         enable-cache: true
-    - run: uv run pyright
+    - run: uv run pyright@1.1.414
