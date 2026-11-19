@@ -1,35 +1,55 @@
 name: lint
+
 on: push
 
 jobs:
   lint-syntax:
     name: syntax-errors
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v5
-      with:
-        enable-cache: true
-    - run: uv run ruff check --no-fix --select PLE
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+
+      - name: Check syntax errors
+        run: uv run ruff check --no-fix --select PLE
 
   lint-style:
     name: code-style
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v5
-      with:
-        enable-cache: true
-    - run: uv sync --dev --all-extras    # install extras for examples to avoid pyright missing imports errors
-    - run: uv run pre-commit run --all-files --show-diff-on-failure
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+
+      - name: Install development dependencies
+        run: uv sync --dev --all-extras
+
+      - name: Run pre-commit checks
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
   lint-typecheck:
     name: type-checker
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
-    - uses: actions/checkout@v4
-    - uses: astral-sh/setup-uv@v6
-      with:
-        enable-cache: true
-    - run: uv sync --dev --all-extras    # install extras for examples to avoid pyright missing imports errors-
-    - run: uv run pyright
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+
+      - name: Install development dependencies
+        run: uv sync --dev --all-extras
+
+      - name: Run Pyright
+        run: uv run pyright
