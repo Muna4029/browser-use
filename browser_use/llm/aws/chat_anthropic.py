@@ -162,6 +162,7 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 					messages=anthropic_messages,
 					system=system_prompt or NOT_GIVEN,
 					**self._get_client_params_for_invoke(),
+					# Add any additional required parameters here
 				)
 
 				usage = self._get_usage(response)
