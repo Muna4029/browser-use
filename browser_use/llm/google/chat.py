@@ -205,7 +205,7 @@ class ChatGoogle(BaseChatModel):
 				# Return string response
 				response = await self.get_client().aio.models.generate_content(
 					model=self.model,
-					contents=contents,  # type: ignore
+					contents=contents if 'contents' in locals() else '',  # type: ignore
 					config=config,
 				)
 
@@ -283,6 +283,8 @@ class ChatGoogle(BaseChatModel):
 
 					# Re-serialize with modified messages
 					contents, _ = GoogleMessageSerializer.serialize_messages(
+						messages, include_system_in_user=self.include_system_in_user
+					) if 'contents' in locals() else ('', None)
 						messages, include_system_in_user=self.include_system_in_user
 					)
 
