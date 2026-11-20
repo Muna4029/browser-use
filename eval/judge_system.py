@@ -521,13 +521,13 @@ async def judge_with_retry(
 	return create_fallback_result(task, 'Max retries exceeded without proper error handling')
 
 
-def _read_result_file(result_file: Path) -> dict[str, Any]:
+def _read_result_file(result_file: str) -> dict[str, Any]:
 	"""Helper function to read result file synchronously."""
 	with open(result_file) as f:
 		return json.load(f)
 
 
-def _write_result_file(result_file: Path, result_data: dict[str, Any]) -> None:
+def _write_result_file(result_file: str, result_data: dict[str, Any]) -> None:
 	"""Helper function to write result file synchronously."""
 	with open(result_file, 'w') as f:
 		f.write(json.dumps(result_data, indent=2, default=str))

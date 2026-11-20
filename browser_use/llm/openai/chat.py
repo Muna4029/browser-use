@@ -139,7 +139,7 @@ class ChatOpenAI(BaseChatModel):
 					model=self.model,
 					messages=openai_messages,
 					temperature=self.temperature,
-					reasoning_effort=self.reasoning_effort,
+					reasoning_effort=ReasoningEffort(self.reasoning_effort),
 				)
 
 				usage = self._get_usage(response)
