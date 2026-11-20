@@ -136,7 +136,7 @@ def get_system_resources():
 		}
 
 
-def log_system_resources(context: str = ''):
+def log_system_resources(context: str = '') -> None:
 	"""Log current system resource usage"""
 	resources = get_system_resources()
 	logger.info(f'=== SYSTEM RESOURCES {context} ===')
@@ -265,7 +265,7 @@ def setup_signal_handlers():
 	signal.signal(signal.SIGTERM, signal_handler)
 
 
-def encode_image(image):
+def encode_image(image: Image.Image) -> str:
 	"""Convert a PIL image to base64 string."""
 	if image.mode == 'RGBA':
 		image = image.convert('RGB')
@@ -328,7 +328,7 @@ Respond with:
 1. **Reasoning**: [Your explanation]  
 2. **Score**: [1-5]"""
 
-	jpg_base64_str = encode_image(Image.open(image_path))
+	jpg_base64_str: str = encode_image(Image.open(image_path))
 
 	prompt = """**Task**: {task}
 
@@ -390,7 +390,7 @@ Action History:
 The potentially important snapshots of the webpage in the agent's trajectory and their reasons:
 {thoughts}"""
 
-	key_points = await identify_key_points(task, model)
+	key_points: str = await identify_key_points(task, model)
 	key_points = key_points.replace('\n\n', '\n')
 
 	try:
@@ -400,7 +400,7 @@ The potentially important snapshots of the webpage in the agent's trajectory and
 		key_points = key_points.split('Key Points:')[-1]
 		key_points = '\n'.join(line.lstrip() for line in key_points.splitlines())
 
-	tasks = [judge_image(task, image_path, key_points, model) for image_path in images_path]
+	tasks: list[TaskResult] = [judge_image(task, image_path, key_points, model) for image_path in images_path]
 	image_responses = await asyncio.gather(*tasks)
 
 	whole_content_img = []
@@ -409,7 +409,7 @@ The potentially important snapshots of the webpage in the agent's trajectory and
 	pattern = r'[1-5]'
 	for response, image_path in zip(image_responses, images_path):
 		try:
-			score_text = response.split('Score')[1]
+			score_text: str = response.split('Score')[1]
 			thought = response.split('**Reasoning**:')[-1].strip().lstrip('\n').split('\n\n')[0].replace('\n', ' ')
 			score = re.findall(pattern, score_text)[0]
 			record.append({'Response': response, 'Score': int(score)})
@@ -505,7 +505,7 @@ except ImportError:
 	logger.warning('Comprehensive judge system not available. Only Mind2Web judge will be available.')
 	COMPREHENSIVE_JUDGE_AVAILABLE = False
 
-	async def evaluate_task_with_comprehensive_judge(*args, **kwargs) -> dict[str, Any]:
+	async def evaluate_task_with_comprehensive_judge(*args, **kwargs) -> dict:
 		"""Fallback function when comprehensive judge system is not available"""
 		raise ImportError('Comprehensive judge system not available')
 
@@ -532,7 +532,7 @@ class TaskResult:
 	confirmed_task: str
 	task: Any
 	max_steps: int
-	laminar_link: str | None = None
+	laminar_link: Optional[str] = None
 	completed_stages: set[Stage] = field(default_factory=set)
 	stage_data: dict[Stage, Any] = field(default_factory=dict)
 	errors: list = field(default_factory=list)
@@ -559,7 +559,7 @@ class TaskResult:
 		self.errors.append(StageError(Stage.SAVE_SERVER, 'server_save', error))
 
 	def has_execution_data(self) -> bool:
-		return Stage.RUN_AGENT in self.completed_stages or Stage.FORMAT_HISTORY in self.completed_stages
+		return Stage.RUN_AGENT in self.completed_stages or Stage.FORMAT_HISTORY in self.completed_stages or Stage.EVALUATE in self.completed_stages
 
 	@property
 	def server_payload(self) -> dict[str, Any]:
@@ -635,7 +635,7 @@ class TaskResult:
 			)
 
 		# Ensure all data in payload is JSON serializable
-		serialized_payload = make_json_serializable(payload)
+		serialized_payload: dict = make_json_serializable(payload)
 		# Type assertion since we know payload is a dict and make_json_serializable preserves dict structure
 		assert isinstance(serialized_payload, dict), 'Payload serialization should preserve dict structure'
 		return serialized_payload
@@ -796,7 +796,7 @@ SUPPORTED_MODELS = {
 }
 
 # Check for SERPER API key
-SERPER_API_KEY = os.getenv('SERPER_API_KEY')
+SERPER_API_KEY: Optional[str] = os.getenv('SERPER_API_KEY')
 if not SERPER_API_KEY:
 	logger.warning('SERPER_API_KEY is not set. Search functionality will not be available.')
 
@@ -806,7 +806,7 @@ def create_controller_with_serp_search():
 	controller = Controller(exclude_actions=['search_google'])
 
 	@controller.registry.action('Search the web for a specific query')
-	async def search_web(query: str):
+	async def search_web(query: str) -> ActionResult:
 		"""Search the web using Serper API"""
 		if not SERPER_API_KEY:
 			return ActionResult(extracted_content='Search unavailable: SERPER_API_KEY not configured', include_in_memory=True)
@@ -849,7 +849,7 @@ def create_controller(use_serp: bool = False):
 		return Controller()
 
 
-def get_llm(model_name: str):
+def get_llm(model_name: str) -> BaseChatModel:
 	"""Instantiates the correct ChatModel based on the model name."""
 	if model_name not in SUPPORTED_MODELS:
 		raise ValueError(f'Unsupported model: {model_name}. Supported models are: {list(SUPPORTED_MODELS.keys())}')
@@ -863,7 +863,7 @@ def get_llm(model_name: str):
 		logger.warning(
 			f'API key environment variable {api_key_env} not found or empty for model {model_name}. Trying without API key if possible.'
 		)
-		api_key = None
+		api_key: Optional[str] = None
 
 	match provider:
 		case 'openai':
@@ -2003,7 +2003,7 @@ def start_new_run(convex_url: str, secret_key: str, run_details: dict, existing_
 
 
 # Helper function to save a task result to the server
-def save_task_result_to_server(convex_url: str, secret_key: str, result_details: dict):
+def save_task_result_to_server(convex_url: str, secret_key: str, result_details: dict) -> bool:
 	"""Sends a request to save a single task result to the Convex backend."""
 
 	if not convex_url:

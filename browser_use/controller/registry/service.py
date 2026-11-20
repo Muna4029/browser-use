@@ -52,7 +52,7 @@ class Registry(Generic[Context]):
 			'browser_context': BrowserSession,  # legacy name
 			'page': Page,
 			'page_extraction_llm': BaseChatModel,
-			'available_file_paths': list,
+			'available_file_paths': list[str],
 			'has_sensitive_data': bool,
 			'file_system': FileSystem,
 		}
@@ -257,7 +257,7 @@ class Registry(Generic[Context]):
 		return normalized_wrapper, param_model
 
 	# @time_execution_sync('--create_param_model')
-	def _create_param_model(self, function: Callable) -> type[BaseModel]:
+	def _create_param_model(self, function: Callable) -> BaseModel:
 		"""Creates a Pydantic model from function signature"""
 		sig = signature(function)
 		special_param_names = set(SpecialActionParameters.model_fields.keys())
@@ -531,7 +531,7 @@ class Registry(Generic[Context]):
 			result_model = individual_action_models[0]
 		else:
 			# Create a Union type using RootModel that properly delegates ActionModel methods
-			union_type = Union[tuple(individual_action_models)]
+			union_type = Union[individual_action_models]
 
 			class ActionModelUnion(RootModel[union_type]):  # type: ignore
 				"""Union of all available action models that maintains ActionModel interface"""
@@ -570,7 +570,7 @@ class Registry(Generic[Context]):
 
 		return result_model  # type:ignore
 
-	def get_prompt_description(self, page=None) -> str:
+	def get_prompt_description(self, page=None) -> str | None:
 		"""Get a description of all actions for the prompt
 
 		If page is provided, only include actions that are available for that page
