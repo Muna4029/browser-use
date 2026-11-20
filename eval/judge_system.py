@@ -194,7 +194,7 @@ def are_images_identical(img_path1: str, img_path2: str) -> bool:
 				return False
 
 			# Compare pixel data
-			return list(img1.getdata()) == list(img2.getdata())
+			return list(img1.getdata()) == list(img2.getdata()) if isinstance(img1, ImagingCore) and isinstance(img2, ImagingCore) else False
 	except Exception as e:
 		logger.warning(f'Failed to compare images {img_path1} and {img_path2}: {e}')
 		return False
@@ -420,7 +420,7 @@ Evaluate this agent execution given the criteria and respond with the exact JSON
 
 	# Build messages
 	content_parts: list[ContentPartTextParam | ContentPartImageParam] = [ContentPartTextParam(text=user_prompt)]
-	content_parts.extend(encoded_images)
+	content_parts.extend([ContentPartImageParam(image=image) for image in encoded_images])
 
 	messages: list[BaseMessage] = [
 		SystemMessage(content=system_prompt),
@@ -524,7 +524,7 @@ async def judge_with_retry(
 def _read_result_file(result_file: Path) -> dict[str, Any]:
 	"""Helper function to read result file synchronously."""
 	with open(result_file) as f:
-		return json.load(f)
+		return json.load(f) if isinstance(result_file, Path) else {}
 
 
 def _write_result_file(result_file: Path, result_data: dict[str, Any]) -> None:
