@@ -92,7 +92,6 @@ class GoogleMessageSerializer:
 
 			# Create the Content object
 			if message_parts:
-				final_message = Content(role=role, parts=message_parts)
-				formatted_messages.append(final_message)
+				final_message = Content(role=role, parts=message_parts)  # Ensure Content is correctly instantiated				formatted_messages.append(final_message)
 
 		return formatted_messages, system_message
