@@ -249,7 +249,8 @@ class Controller(Generic[Context]):
 			msg = None
 
 			try:
-				assert element_node is not None, f'Element with index {params.index} does not exist'
+				if element_node is None:
+					raise Exception(f'Element with index {params.index} does not exist')
 				download_path = await browser_session._click_element_node(element_node)
 				if download_path:
 					emoji = '💾'
@@ -289,7 +290,8 @@ class Controller(Generic[Context]):
 				raise Exception(f'Element index {params.index} does not exist - retry or use alternative actions')
 
 			element_node = await browser_session.get_dom_element_by_index(params.index)
-			assert element_node is not None, f'Element with index {params.index} does not exist'
+			if element_node is None:
+				raise Exception(f'Element with index {params.index} does not exist')
 			try:
 				await browser_session._input_text_element_node(element_node, params.text)
 			except Exception:

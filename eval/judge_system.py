@@ -209,7 +209,7 @@ def are_images_identical(img_path1: str, img_path2: str) -> bool:
 				return False
 
 			# Compare pixel data
-			return list(img1.getdata()) == list(img2.getdata())
+			return list(img1.getdata()) == list(img2.getdata()) if isinstance(img1, Iterable) and isinstance(img2, Iterable) else False
 	except Exception as e:
 		logger.warning(f'Failed to compare images {img_path1} and {img_path2}: {e}')
 		return False
@@ -608,7 +608,7 @@ async def evaluate_task_with_comprehensive_judge(task_folder: Path, model: BaseC
 			final_result=final_result,
 			screenshot_paths=screenshot_paths,
 			model=model,
-			max_images=max_images,
+			max_images=max_images if isinstance(max_images, int) and max_images > 0 else 10,
 		)
 
 		# Convert to dict for storage
