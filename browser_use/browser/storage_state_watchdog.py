@@ -196,7 +196,7 @@ class StorageStateWatchdog(BaseWatchdog):
 				storage_state = await self.browser_session._browser_context.storage_state()
 
 				# Update our last known state
-				self._last_cookie_state = storage_state.get('cookies', []).copy()
+				self._last_cookie_state = [Cookie(**cookie) for cookie in storage_state.get('cookies', []).copy()]
 
 				# Convert path to Path object
 				json_path = Path(save_path).expanduser().resolve()
@@ -316,7 +316,7 @@ class StorageStateWatchdog(BaseWatchdog):
 
 		return merged
 
-	async def get_current_cookies(self) -> list[Cookie]:
+	async def get_current_cookies(self) -> list[StorageStateCookie]:
 		"""Get current cookies from browser context."""
 		if not self.browser_session._browser_context:
 			return []
@@ -327,7 +327,7 @@ class StorageStateWatchdog(BaseWatchdog):
 			logger.error(f'[StorageStateWatchdog] Failed to get cookies: {e}')
 			return []
 
-	async def add_cookies(self, cookies: list[Cookie]) -> None:
+	async def add_cookies(self, cookies: list[StorageStateCookie]) -> None:
 		"""Add cookies to browser context."""
 		if not self.browser_session._browser_context:
 			logger.warning('[StorageStateWatchdog] No browser context available for adding cookies')
