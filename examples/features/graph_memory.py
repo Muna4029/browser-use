@@ -35,8 +35,8 @@ graph_memory_config = MemoryConfig(
 	graph_store_provider='neo4j',
 	graph_store_config_override={
 		'url': NEO4J_URI,
-		'username': NEO4J_USERNAME,
-		'password': NEO4J_PASSWORD,
+		'username': os.getenv('NEO4J_USERNAME'),
+		'password': os.getenv('NEO4J_PASSWORD'),
 	},
 	# Optional: Override LLM specifically for graph operations within Mem0.
 	# This tells Mem0 to use `mem0_internal_graph_llm` for its graph-related LLM calls.
