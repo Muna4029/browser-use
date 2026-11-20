@@ -144,7 +144,9 @@ class Controller(Generic[Context]):
 				msg = f'🕒  Waiting for {actual_seconds} seconds'
 			logger.info(msg)
 			await asyncio.sleep(actual_seconds)
-			return ActionResult(extracted_content=msg, include_in_memory=True, long_term_memory=f'Waited for {actual_seconds} seconds')
+			return ActionResult(
+				extracted_content=msg, include_in_memory=True, long_term_memory=f'Waited for {actual_seconds} seconds'
+			)
 
 		# Element Interaction Actions
 
@@ -339,9 +341,9 @@ Only use this for specific queries for information retrieval from the page. Don'
 
 			# Aggressive timeout for page content
 			try:
-				page_html_result = await asyncio.wait_for(page.content(), timeout=10.0)  # 5 second aggressive timeout
+				page_html_result = await asyncio.wait_for(page.content(), timeout=10.0)  # 10 second aggressive timeout
 			except TimeoutError:
-				raise RuntimeError('Page content extraction timed out after 5 seconds')
+				raise RuntimeError('Page content extraction timed out after 10 seconds')
 			except Exception as e:
 				raise RuntimeError(f"Couldn't extract page content: {e}")
 

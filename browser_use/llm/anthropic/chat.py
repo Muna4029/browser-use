@@ -132,7 +132,7 @@ class ChatAnthropic(BaseChatModel):
 				# Normal completion without structured output
 				response = await self.get_client().messages.create(
 					model=self.model,
-					messages=anthropic_messages,
+					messages=anthropic_messages,  # Ensure messages is of the correct type
 					system=system_prompt or NOT_GIVEN,
 					**self._get_client_params_for_invoke(),
 				)
