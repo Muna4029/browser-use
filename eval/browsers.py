@@ -183,7 +183,7 @@ async def setup_resource_blocking(browser_session: BrowserSession, block_images:
 			logger.warning(f'Error in resource blocking handler: {e}')
 			try:
 				await route.continue_()
-			except:
+			except Exception:
 				pass  # Route might already be handled
 
 	# Intercept all requests and apply blocking rules
@@ -257,6 +257,9 @@ async def setup_browser_session(
 				logger.error(
 					f'Browser setup: Failed to create Browserbase session for task {task.task_id}: {type(e).__name__}: {e}'
 				)
+			except Exception:
+				logger.info(f'Browser setup: Falling back to local browser for task {task.task_id}')
+				cdp_url = None
 				logger.info(f'Browser setup: Falling back to local browser for task {task.task_id}')
 				cdp_url = None
 		else:
