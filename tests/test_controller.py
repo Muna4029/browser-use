@@ -46,14 +46,14 @@ class TestControllerIntegration:
 		yield browser_instance
 		await browser_instance.close()
 
-	@pytest.fixture
+	@pytest.fixture(scope='function')
 	async def browser_context(self, browser):
 		"""Create and provide a BrowserContext instance."""
 		context = BrowserContext(browser=browser)
 		yield context
 		await context.close()
 
-	@pytest.fixture
+	@pytest.fixture(scope='function')
 	def controller(self):
 		"""Create and provide a Controller instance."""
 		return Controller()
