@@ -263,7 +263,7 @@ def are_images_identical(img_path1: str, img_path2: str) -> bool:
 				return False
 
 			# Compare pixel data
-			return list(img1.getdata()) == list(img2.getdata())
+			return list(img1.getdata()) == list(img2.getdata()) if isinstance(img1, Iterable) and isinstance(img2, Iterable) else False
 	except Exception as e:
 		logger.warning(f'Failed to compare images {img_path1} and {img_path2}: {e}')
 		return False
@@ -540,6 +540,7 @@ def parse_judge_response(result_dict: dict, task: str) -> JudgeResult:
 		final_score = result_dict.get('final_score', 50)
 
 		return JudgeResult(
+			# Ensure all fields are correctly populated
 			task_summary=result_dict.get('task_summary', 'Task analysis unavailable'),
 			task_clarity_score=result_dict.get('task_clarity_score', 50),
 			task_categories=task_categories,

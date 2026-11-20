@@ -47,14 +47,14 @@ class Registry(Generic[Context]):
 		# e.g. playwright page, 2fa code getters, sensitive_data wrappers, other context, etc.
 		return {
 			'context': None,  # Context is a TypeVar, so we can't validate type
-			'browser_session': BrowserSession,
-			'browser': BrowserSession,  # legacy name
-			'browser_context': BrowserSession,  # legacy name
-			'page': Page,
-			'page_extraction_llm': BaseChatModel,
-			'available_file_paths': list,
-			'has_sensitive_data': bool,
-			'file_system': FileSystem,
+			'browser_session': BrowserSession(),
+			'browser': BrowserSession(),  # legacy name
+			'browser_context': BrowserSession(),  # legacy name
+			'page': Page(),
+			'page_extraction_llm': BaseChatModel(),
+			'available_file_paths': [],
+			'has_sensitive_data': False,
+			'file_system': FileSystem(),
 		}
 
 	def _normalize_action_function_signature(
@@ -171,6 +171,7 @@ class Registry(Generic[Context]):
 			else:
 				# Type 2 pattern - need to unpack params
 				# If params is None, try to create it from kwargs
+				params = {}
 				if params is None and action_params:
 					# Extract action params from kwargs
 					action_kwargs = {}
@@ -469,10 +470,10 @@ class Registry(Generic[Context]):
 		if all_missing_placeholders:
 			logger.warning(f'Missing or empty keys in sensitive_data dictionary: {", ".join(all_missing_placeholders)}')
 
-		return type(params).model_validate(processed_params)
+		return params.model_validate(processed_params)
 
 	# @time_execution_sync('--create_action_model')
-	def create_action_model(self, include_actions: list[str] | None = None, page=None) -> type[ActionModel]:
+	def create_action_model(self, include_actions: list[str] | None = None, page=None) -> ActionModel:
 		"""Creates a Union of individual action models from registered actions,
 		used by LLM APIs that support tool calling & enforce a schema.
 
@@ -533,7 +534,7 @@ class Registry(Generic[Context]):
 		# Meaning the length is more than 1
 		else:
 			# Create a Union type using RootModel that properly delegates ActionModel methods
-			union_type = Union[tuple(individual_action_models)]  # type: ignore : Typing doesn't understand that the length is >= 2 (by design)
+			union_type = Union[individual_action_models]  # type: ignore : Typing doesn't understand that the length is >= 2 (by design)
 
 			class ActionModelUnion(RootModel[union_type]):  # type: ignore
 				"""Union of all available action models that maintains ActionModel interface"""
@@ -565,7 +566,7 @@ class Registry(Generic[Context]):
 			ControllerRegisteredFunctionsTelemetryEvent(
 				registered_functions=[
 					RegisteredFunction(name=name, params=action.param_model.model_json_schema())
-					for name, action in available_actions.items()
+					for name, action in available_actions.items():
 				]
 			)
 		)
