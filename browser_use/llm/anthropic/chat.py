@@ -101,7 +101,7 @@ class ChatAnthropic(BaseChatModel):
 	def name(self) -> str:
 		return str(self.model)
 
-	def _get_usage(self, response: Message) -> ChatInvokeUsage | None:
+	def _get_usage(self, response: Message) -> ChatInvokeUsage:
 		usage = ChatInvokeUsage(
 			prompt_tokens=response.usage.input_tokens
 			+ (
@@ -124,6 +124,8 @@ class ChatAnthropic(BaseChatModel):
 	async def ainvoke(
 		self, messages: list[BaseMessage], output_format: type[T] | None = None
 	) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
+		if output_format is not None and not isinstance(output_format, type):
+			raise TypeError('output_format must be a type')
 		anthropic_messages, system_prompt = AnthropicMessageSerializer.serialize_messages(messages)
 
 		try:
@@ -134,6 +136,7 @@ class ChatAnthropic(BaseChatModel):
 					messages=anthropic_messages,
 					system=system_prompt or NOT_GIVEN,
 					**self._get_client_params_for_invoke(),
+					output_format=output_format,
 				)
 
 				usage = self._get_usage(response)
