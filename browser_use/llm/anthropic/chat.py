@@ -135,6 +135,7 @@ class ChatAnthropic(BaseChatModel):
 					messages=anthropic_messages,
 					system=system_prompt or NOT_GIVEN,
 					**self._get_client_params_for_invoke(),
+					# Ensure the correct parameters are passed
 				)
 
 				usage = self._get_usage(response)

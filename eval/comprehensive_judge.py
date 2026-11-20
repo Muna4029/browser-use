@@ -423,7 +423,7 @@ Respond with EXACTLY this JSON structure (no additional text before or after):
 Evaluate this agent execution given the criteria and respond with the exact JSON structure requested."""
 
 	# Build messages
-	content_parts: list[ContentPartTextParam | ContentPartImageParam] = [ContentPartTextParam(text=user_prompt)]
+	content_parts: list[ContentPart] = [ContentPartTextParam(text=user_prompt)]
 	content_parts.extend(encoded_images)
 
 	messages: list[BaseMessage] = [
