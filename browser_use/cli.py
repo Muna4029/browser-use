@@ -211,6 +211,8 @@ def get_llm(config: dict[str, Any]):
 				print('⚠️  Anthropic API key not found. Please update your config or set ANTHROPIC_API_KEY environment variable.')
 				sys.exit(1)
 			return ChatAnthropic(model=model_name, temperature=temperature)
+				sys.exit(1)
+			return ChatAnthropic(model=model_name, temperature=temperature)
 		elif model_name.startswith('gemini'):
 			if not CONFIG.GOOGLE_API_KEY:
 				print('⚠️  Google API key not found. Please update your config or set GOOGLE_API_KEY environment variable.')
@@ -424,7 +426,7 @@ class BrowserUseApp(App):
 		Binding('down', 'input_history_next', 'Next command', show=False),
 	]
 
-	def __init__(self, config: dict[str, Any], *args, **kwargs):
+	def __init__(self, config: dict, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.config = config
 		self.browser_session: BrowserSession | None = None  # Will be set before app.run_async()

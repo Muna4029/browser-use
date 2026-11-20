@@ -423,7 +423,7 @@ Respond with EXACTLY this JSON structure (no additional text before or after):
 Evaluate this agent execution given the criteria and respond with the exact JSON structure requested."""
 
 	# Build messages
-	content_parts: list[ContentPartTextParam | ContentPartImageParam] = [ContentPartTextParam(text=user_prompt)]
+	content_parts: list[ContentPartTextParam] = [ContentPartTextParam(text=user_prompt)]
 	content_parts.extend(encoded_images)
 
 	messages: list[BaseMessage] = [
@@ -435,7 +435,7 @@ Evaluate this agent execution given the criteria and respond with the exact JSON
 	try:
 		response = await model.ainvoke(messages, output_format=JudgeResult)
 		logger.info(f'Judge response: {response}')
-		return response.completion
+		return JudgeResult(task_summary=response.completion)
 
 	except Exception as e:
 		logger.error(f'Judge evaluation failed: {e}')
