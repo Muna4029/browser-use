@@ -1,6 +1,5 @@
 import asyncio
 import logging
-
 import aiofiles
 from browser_use.llm import ChatGoogle
 from browser_use.llm.messages import UserMessage
@@ -10,7 +9,6 @@ from worker_agent import WorkerAgent
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 class BaseAgent:
 	"""Dynamic base agent that can handle any natural language prompt and automatically determine optimal worker count."""
