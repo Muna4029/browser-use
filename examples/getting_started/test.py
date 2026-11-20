@@ -15,7 +15,10 @@ import os
 import sys
 
 # Add the parent directory to the path so we can import browser_use
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from pathlib import Path
+
+# Add the parent directory to the path so we can import browser_use
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
 
@@ -27,7 +30,7 @@ from browser_use.llm.openai.chat import ChatOpenAI
 
 async def main():
 	# Initialize the model
-	llm = ChatOpenAI(model='gpt-4.1-mini')
+	llm = ChatOpenAI(model='gpt-4')
 
 	# Define a data extraction task
 	task = """
@@ -45,8 +48,6 @@ async def main():
 	# Create and run the agent
 	agent = Agent(task=task, llm=llm)
 	await agent.run()
-	
-    
 
 
 if __name__ == '__main__':

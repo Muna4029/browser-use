@@ -143,6 +143,7 @@ class ChatAnthropic(BaseChatModel):
 					messages=anthropic_messages,
 					system=system_prompt or NOT_GIVEN,
 					**self._get_client_params_for_invoke(),
+					# Add any additional parameters required by the create function here
 				)
 
 				# Ensure we have a valid Message object before accessing attributes

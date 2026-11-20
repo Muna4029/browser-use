@@ -510,7 +510,7 @@ async def test_multiple_mcp_servers(test_mcp_server_script):
 		await mcp2.disconnect()
 
 
-async def test_mcp_result_formatting(test_mcp_server_script):
+async def test_mcp_result_formatting(test_mcp_server_script: str):
 	"""Test that different MCP result formats are handled correctly."""
 	controller = Controller()
 
@@ -533,7 +533,7 @@ async def test_mcp_result_formatting(test_mcp_server_script):
 		await mcp_client.disconnect()
 
 
-async def test_agent_with_multiple_mcp_servers(test_mcp_server_script, httpserver: HTTPServer):
+async def test_agent_with_multiple_mcp_servers(test_mcp_server_script: str, httpserver: HTTPServer):
 	"""Test agent using tools from multiple MCP servers in a single task."""
 	# Set up test webpage
 	httpserver.expect_request('/').respond_with_data(
@@ -633,7 +633,7 @@ Use tools from both servers to complete the task.""",
 		await browser_session.kill()
 
 
-async def test_mcp_nested_object_parameters(test_mcp_server_script):
+async def test_mcp_nested_object_parameters(test_mcp_server_script: str):
 	"""Test that MCP tools with nested object parameters are properly handled."""
 	controller = Controller()
 
@@ -772,7 +772,7 @@ async def test_mcp_array_type_inference(test_mcp_server_script):
 		# Check number_list is list[float] | None (since it's optional)
 		number_list_type = number_list_field.annotation
 		# For optional fields, the type is Union[list[float], None]
-		assert get_origin(number_list_type) in (typing.Union, type(list[float] | None))
+		assert get_origin(number_list_type) in (typing.Union, list)
 		union_args = get_args(number_list_type)
 		assert type(None) in union_args
 		# Find the list type in the union
@@ -782,7 +782,7 @@ async def test_mcp_array_type_inference(test_mcp_server_script):
 
 		# Check config_list is list[ConfigModel] | None
 		config_list_type = config_list_field.annotation
-		assert get_origin(config_list_type) in (typing.Union, type(list[object] | None))
+		assert get_origin(config_list_type) in (typing.Union, list)
 		union_args = get_args(config_list_type)
 		assert type(None) in union_args
 		# Find the list type in the union
@@ -802,7 +802,7 @@ async def test_mcp_array_type_inference(test_mcp_server_script):
 
 		# Check simple_array is just list | None (no item type)
 		simple_array_type = simple_array_field.annotation
-		assert get_origin(simple_array_type) in (typing.Union, type(list | None))
+		assert get_origin(simple_array_type) in (typing.Union, list)
 		union_args = get_args(simple_array_type)
 		assert type(None) in union_args
 		# Should have plain list without type args
