@@ -73,11 +73,16 @@ class StorageStateWatchdog(BaseWatchdog):
 		# Use provided path or fall back to profile default
 		path = event.path
 		if path is None:
-			# Use profile default path if available
-			if self.browser_session.browser_profile.storage_state:
-				path = str(self.browser_session.browser_profile.storage_state)
+			# Use profile default path if available and valid (guard against pydantic NotGiven)
+			profile_storage = self.browser_session.browser_profile.storage_state
+			if isinstance(profile_storage, (str, os.PathLike)):
+				path = str(profile_storage)
+			elif isinstance(profile_storage, dict):
+				# Storage already provided in-memory; no file path to use
+				path = None
 			else:
-				path = None  # Skip saving if no path available
+				# Unknown sentinel (e.g. NotGiven) - skip saving to file
+				path = None
 		await self._save_storage_state(path)
 
 	async def on_LoadStorageStateEvent(self, event: LoadStorageStateEvent) -> None:
@@ -85,10 +90,12 @@ class StorageStateWatchdog(BaseWatchdog):
 		# Use provided path or fall back to profile default
 		path = event.path
 		if path is None:
-			# Use profile default path if available
-			if self.browser_session.browser_profile.storage_state:
-				path = str(self.browser_session.browser_profile.storage_state)
+			# Use profile default path if available and valid (guard against pydantic NotGiven)
+			profile_storage = self.browser_session.browser_profile.storage_state
+			if isinstance(profile_storage, (str, os.PathLike)):
+				path = str(profile_storage)
 			else:
+				# If it's a dict or an unknown sentinel, there is no file path to load from
 				path = None  # Skip loading if no path available
 		await self._load_storage_state(path)
 
@@ -181,7 +188,15 @@ class StorageStateWatchdog(BaseWatchdog):
 				logger.warning('[StorageStateWatchdog] No browser context available for saving')
 				return
 
-			save_path = path or self.browser_session.browser_profile.storage_state
+			profile_storage = self.browser_session.browser_profile.storage_state
+			if path is not None:
+				save_path = path
+			else:
+				# Accept only string/path-like/file-backed dict; guard against pydantic NotGiven sentinel
+				if isinstance(profile_storage, (str, os.PathLike, dict)):
+					save_path = profile_storage
+				else:
+					save_path = None
 			if not save_path:
 				return
 
@@ -247,7 +262,15 @@ class StorageStateWatchdog(BaseWatchdog):
 			logger.warning('[StorageStateWatchdog] No browser context available for loading')
 			return
 
-		load_path = path or self.browser_session.browser_profile.storage_state
+		profile_storage = self.browser_session.browser_profile.storage_state
+		if path is not None:
+			load_path = path
+		else:
+			# Only consider a file path if profile_storage is string/path-like
+			if isinstance(profile_storage, (str, os.PathLike)):
+				load_path = profile_storage
+			else:
+				load_path = None
 		if not load_path or not os.path.exists(str(load_path)):
 			return
 
@@ -316,7 +339,7 @@ class StorageStateWatchdog(BaseWatchdog):
 
 		return merged
 
-	async def get_current_cookies(self) -> list[Cookie]:
+	async def get_current_cookies(self) -> list[dict[str, Any]]:
 		"""Get current cookies from browser context."""
 		if not self.browser_session._browser_context:
 			return []
@@ -327,7 +350,7 @@ class StorageStateWatchdog(BaseWatchdog):
 			logger.error(f'[StorageStateWatchdog] Failed to get cookies: {e}')
 			return []
 
-	async def add_cookies(self, cookies: list[Cookie]) -> None:
+	async def add_cookies(self, cookies: list[dict[str, Any]]) -> None:
 		"""Add cookies to browser context."""
 		if not self.browser_session._browser_context:
 			logger.warning('[StorageStateWatchdog] No browser context available for adding cookies')

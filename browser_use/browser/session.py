@@ -1232,30 +1232,45 @@ class BrowserSession(BaseModel):
 			if css_selector:
 				current_frame = current_frame.frame_locator(css_selector)
 			else:
-				logger.debug(f'Using XPath for iframe: {parent.xpath}')
-				current_frame = current_frame.frame_locator(f'xpath={parent.xpath}')
+				# Safely obtain parent's xpath as a plain string
+				parent_xpath = getattr(parent, 'xpath', '')
+				if not isinstance(parent_xpath, str) or not parent_xpath:
+					logger.debug('Skipping iframe parent without valid xpath')
+					continue
+				logger.debug(f'Using XPath for iframe: {parent_xpath}')
+				current_frame = current_frame.frame_locator(f'xpath={parent_xpath}')
 
+		# Safely obtain element xpath and css selector
 		css_selector = self._enhanced_css_selector_for_element(
 			element, include_dynamic_attributes=self.browser_profile.include_dynamic_attributes
 		)
+		element_xpath = getattr(element, 'xpath', '')
+		if not isinstance(element_xpath, str):
+			element_xpath = ''
 
 		try:
 			if hasattr(current_frame, 'locator'):
 				if css_selector:
 					element_handle = await current_frame.locator(css_selector).element_handle()
 				else:
-					# Fall back to XPath when CSS selector is empty
-					logger.debug(f'CSS selector empty, falling back to XPath: {element.xpath}')
-					element_handle = await current_frame.locator(f'xpath={element.xpath}').element_handle()
+					# Fall back to XPath when CSS selector is empty and xpath available
+					if not element_xpath:
+						logger.debug('No valid xpath available to fall back to')
+						return None
+					logger.debug(f'CSS selector empty, falling back to XPath: {element_xpath}')
+					element_handle = await current_frame.locator(f'xpath={element_xpath}').element_handle()
 				return element_handle
 			else:
 				# FrameLocator doesn't have query_selector, use locator instead
 				if css_selector:
 					element_handle = await current_frame.locator(css_selector).element_handle()
 				else:
-					# Fall back to XPath
-					logger.debug(f'CSS selector empty, falling back to XPath: {element.xpath}')
-					element_handle = await current_frame.locator(f'xpath={element.xpath}').element_handle()
+					# Fall back to XPath if xpath available
+					if not element_xpath:
+						logger.debug('No valid xpath available to fall back to')
+						return None
+					logger.debug(f'CSS selector empty, falling back to XPath: {element_xpath}')
+					element_handle = await current_frame.locator(f'xpath={element_xpath}').element_handle()
 				if element_handle:
 					is_visible = await self._is_visible(element_handle)
 					if is_visible:
@@ -1266,11 +1281,14 @@ class BrowserSession(BaseModel):
 			# If CSS selector failed, try XPath as fallback
 			if css_selector and 'CSS.escape' not in str(e):
 				try:
-					logger.debug(f'CSS selector failed ({css_selector}), falling back to XPath: {element.xpath}')
+					if not element_xpath:
+						logger.debug('CSS selector failed and no valid xpath available')
+						return None
+					logger.debug(f'CSS selector failed ({css_selector}), falling back to XPath: {element_xpath}')
 					if hasattr(current_frame, 'locator'):
-						element_handle = await current_frame.locator(f'xpath={element.xpath}').element_handle()
+						element_handle = await current_frame.locator(f'xpath={element_xpath}').element_handle()
 					else:
-						element_handle = await current_frame.locator(f'xpath={element.xpath}').element_handle()
+						element_handle = await current_frame.locator(f'xpath={element_xpath}').element_handle()
 					if element_handle:
 						is_visible = await self._is_visible(element_handle)
 						if is_visible:
