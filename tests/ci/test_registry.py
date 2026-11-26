@@ -287,13 +287,13 @@ class TestActionRegistryParameterPatterns:
 		assert 'Legacy context: test2, URL:' in result2.extracted_content
 		assert '/test' in result2.extracted_content
 
-	async def test_page_parameter_optimization(self, browser_session: BrowserSession, httpserver: HTTPServer):
+	async def test_page_parameter_optimization(self, browser_session: BrowserSession, http_server: HTTPServer):
 		"""Test that actions can use page: Page parameter directly instead of browser_session"""
 		registry = Registry()
 
-		httpserver.expect_request('/test').respond_with_data('<html><body>Test Page</body></html>')
+		http_server.expect_request('/test').respond_with_data('<html><body>Test Page</body></html>')
 		page = await browser_session.get_current_page()
-		await page.goto(httpserver.url_for('/test'))
+		await page.goto(http_server.url_for('/test'))
 
 		# Action that takes page directly (optimized pattern)
 		@registry.action('Action with direct page parameter')

@@ -505,7 +505,7 @@ except ImportError:
 	logger.warning('Comprehensive judge system not available. Only Mind2Web judge will be available.')
 	COMPREHENSIVE_JUDGE_AVAILABLE = False
 
-	async def evaluate_task_with_comprehensive_judge(*args, **kwargs) -> dict[str, Any]:
+	async def evaluate_task_with_comprehensive_judge(*args, **kwargs) -> Dict[str, Any]:
 		"""Fallback function when comprehensive judge system is not available"""
 		raise ImportError('Comprehensive judge system not available')
 
@@ -532,12 +532,12 @@ class TaskResult:
 	confirmed_task: str
 	task: Any
 	max_steps: int
-	laminar_link: str | None = None
-	completed_stages: set[Stage] = field(default_factory=set)
-	stage_data: dict[Stage, Any] = field(default_factory=dict)
-	errors: list = field(default_factory=list)
+	laminar_link: Optional[str] = None
+	completed_stages: Set[Stage] = field(default_factory=set)
+	stage_data: Dict[Stage, Any] = field(default_factory=dict)
+	errors: List[Any] = field(default_factory=list)
 	cancelled: bool = False
-	critical_error: str | None = None
+	critical_error: Optional[str] = None
 	server_save_failed: bool = False
 
 	def stage_completed(self, stage: Stage, data: Any = None):
@@ -562,7 +562,7 @@ class TaskResult:
 		return Stage.RUN_AGENT in self.completed_stages or Stage.FORMAT_HISTORY in self.completed_stages
 
 	@property
-	def server_payload(self) -> dict[str, Any]:
+	def server_payload(self) -> Dict[str, Any]:
 		"""Generate payload for server submission"""
 		payload = {
 			'taskId': self.task_id,
@@ -640,7 +640,7 @@ class TaskResult:
 		assert isinstance(serialized_payload, dict), 'Payload serialization should preserve dict structure'
 		return serialized_payload
 
-	def get_local_status(self) -> dict[str, Any]:
+	def get_local_status(self) -> Dict[str, Any]:
 		"""Get local status summary"""
 		success = (
 			Stage.EVALUATE in self.completed_stages
@@ -865,40 +865,40 @@ def get_llm(model_name: str):
 		)
 		api_key = None
 
-	match provider:
-		case 'openai':
-			kwargs = {'model': config['model_name'], 'temperature': 0.0}
-			# Must set temperatue=1 if model is gpt-o4-mini
-			if model_name == 'gpt-o4-mini':
-				kwargs['temperature'] = 1
-			if api_key:
-				kwargs['api_key'] = api_key
-			return ChatOpenAI(**kwargs)
-		case 'anthropic':
-			kwargs = {
-				'model': config['model_name'],
-				'temperature': 0.0,
-				'timeout': 100,
-			}
-			if api_key:
-				kwargs['api_key'] = api_key
-			return ChatAnthropic(**kwargs)
-		case 'google':
-			kwargs = {'model': config['model_name'], 'temperature': 0.0}
-			if api_key:
-				kwargs['api_key'] = api_key
-			return ChatGoogle(**kwargs)
-		case 'openai_compatible':
-			kwargs = {'model': config['model_name'], 'base_url': config['base_url'], 'temperature': 0.0}
-			if api_key:
-				kwargs['api_key'] = api_key
-			elif config.get('base_url'):
-				logger.warning(
-					f'API key for {model_name} at {config["base_url"]} is missing, but base_url is specified. Authentication may fail.'
-				)
-			return ChatOpenAI(**kwargs)
-		case _:
-			raise ValueError(f'Unknown provider: {provider}')
+	# Use if/elif to avoid Python 3.10+ match/case syntax for compatibility
+	if provider == 'openai':
+		kwargs = {'model': config['model_name'], 'temperature': 0.0}
+		# Must set temperatue=1 if model is gpt-o4-mini
+		if model_name == 'gpt-o4-mini':
+			kwargs['temperature'] = 1
+		if api_key:
+			kwargs['api_key'] = api_key
+		return ChatOpenAI(**kwargs)
+	elif provider == 'anthropic':
+		kwargs = {
+			'model': config['model_name'],
+			'temperature': 0.0,
+			'timeout': 100,
+		}
+		if api_key:
+			kwargs['api_key'] = api_key
+		return ChatAnthropic(**kwargs)
+	elif provider == 'google':
+		kwargs = {'model': config['model_name'], 'temperature': 0.0}
+		if api_key:
+			kwargs['api_key'] = api_key
+		return ChatGoogle(**kwargs)
+	elif provider == 'openai_compatible':
+		kwargs = {'model': config['model_name'], 'base_url': config['base_url'], 'temperature': 0.0}
+		if api_key:
+			kwargs['api_key'] = api_key
+		elif config.get('base_url'):
+			logger.warning(
+				f'API key for {model_name} at {config["base_url"]} is missing, but base_url is specified. Authentication may fail.'
+			)
+		return ChatOpenAI(**kwargs)
+	else:
+		raise ValueError(f'Unknown provider: {provider}')
 
 
 def clean_action_dict(action_dict: dict) -> dict:
@@ -1258,14 +1258,14 @@ async def judge_task_result(model, task_folder: Path, score_threshold: float = 3
 		}
 
 
-async def run_stage(stage: Stage, stage_func, timeout: int | None = None):
+async def run_stage(stage: Stage, stage_func, timeout: Optional[int] = None):
 	"""Generic stage runner with timeout"""
 	if timeout:
 		return await asyncio.wait_for(stage_func(), timeout)
 	return await stage_func()
 
 
-async def setup_browser_session(task: Task, headless: bool, highlight_elements: bool = True) -> BrowserSession:
+async def setup_browser_session(task: Task, headless: bool, highlight_elements: bool = True):
 	"""Setup browser session for the task"""
 	logger.debug(f'Browser setup: Initializing BrowserSession for task {task.task_id}')
 
@@ -1314,7 +1314,7 @@ async def run_agent_with_browser(
 	memory_interval: int = 10,
 	max_actions_per_step: int = 10,
 	validate_output: bool = False,
-	planner_llm: BaseChatModel | None = None,
+	planner_llm: Optional[BaseChatModel] = None,
 	planner_interval: int = 1,
 ) -> AgentHistoryList:
 	"""Run agent with the browser session"""

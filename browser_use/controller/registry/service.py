@@ -578,4 +578,15 @@ class Registry(Generic[Context]):
 		If page is provided, only include actions that are available for that page
 		based on their filter_func
 		"""
-		return self.registry.get_prompt_description(page=page)
+		desc = self.registry.get_prompt_description(page=page)
+		# Ensure the return type matches the annotated str. If the underlying
+		# registry returns a non-str (e.g. dict), convert it to a JSON string
+		# when possible, otherwise fall back to str().
+		if isinstance(desc, str):
+			return desc
+		try:
+			import json
+			# json.dumps will convert dicts/lists into a stable string form
+			return json.dumps(desc)
+		except Exception:
+			return str(desc)
