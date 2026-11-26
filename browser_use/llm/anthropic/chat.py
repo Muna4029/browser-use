@@ -67,10 +67,11 @@ class ChatAnthropic(BaseChatModel):
 			'default_query': self.default_query,
 		}
 
-		# Create client_params dict with non-None values and non-NotGiven values
+		# Create client_params dict with non-None values and non-sentinel NOT_GIVEN values
 		client_params = {}
 		for k, v in base_params.items():
-			if v is not None and v is not NotGiven():
+			# Compare against the module-level sentinel NOT_GIVEN instead of constructing a new one
+			if v is not None and v is not NOT_GIVEN:
 				client_params[k] = v
 
 		return client_params
@@ -133,7 +134,7 @@ class ChatAnthropic(BaseChatModel):
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
+					system=system_prompt if isinstance(system_prompt, str) else None,
 					**self._get_client_params_for_invoke(),
 				)
 
@@ -176,7 +177,7 @@ class ChatAnthropic(BaseChatModel):
 					model=self.model,
 					messages=anthropic_messages,
 					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
+					system=system_prompt if isinstance(system_prompt, str) else None,
 					tool_choice=tool_choice,
 					**self._get_client_params_for_invoke(),
 				)

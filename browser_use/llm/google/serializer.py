@@ -1,6 +1,6 @@
 import base64
 
-from google.genai.types import Content, ContentListUnion, Part
+from google.genai.types import Content, Part
 
 from browser_use.llm.messages import (
 	AssistantMessage,
@@ -14,7 +14,7 @@ class GoogleMessageSerializer:
 	"""Serializer for converting messages to Google Gemini format."""
 
 	@staticmethod
-	def serialize_messages(messages: list[BaseMessage]) -> tuple[ContentListUnion, str | None]:
+	def serialize_messages(messages: list[BaseMessage]) -> tuple[list[Content], str | None]:
 		"""
 		Convert a list of BaseMessages to Google format, extracting system message.
 
@@ -33,7 +33,7 @@ class GoogleMessageSerializer:
 
 		messages = [m.model_copy(deep=True) for m in messages]
 
-		formatted_messages: ContentListUnion = []
+		formatted_messages: list[Content] = []
 		system_message: str | None = None
 
 		for message in messages:
@@ -44,13 +44,31 @@ class GoogleMessageSerializer:
 				# Extract system message content as string
 				if isinstance(message.content, str):
 					system_message = message.content
-				elif message.content is not None:
-					# Handle Iterable of content parts
-					parts = []
-					for part in message.content:
-						if part.type == 'text':
-							parts.append(part.text)
-					system_message = '\n'.join(parts)
+				elif message.content is None or type(message.content).__name__ == 'NotGiven':
+					# No usable content
+					pass
+				else:
+					# Attempt to iterate content safely; if not iterable, coerce to string
+					parts: list[str] = []
+					try:
+						iterator = iter(message.content)
+					except TypeError:
+						system_message = str(message.content)
+					else:
+						for part in iterator:
+							ptype = getattr(part, 'type', None)
+							if ptype == 'text':
+								parts.append(getattr(part, 'text', ''))
+							elif ptype == 'refusal':
+								parts.append(f"[Refusal] {getattr(part, 'refusal', '')}")
+							elif ptype == 'image_url':
+								url_obj = getattr(part, 'image_url', None)
+								url = getattr(url_obj, 'url', '') if url_obj is not None else ''
+								parts.append(url)
+							else:
+								parts.append(str(part))
+						if parts:
+							system_message = '\n'.join(parts)
 				continue
 
 			# Determine the role for non-system messages
@@ -69,26 +87,41 @@ class GoogleMessageSerializer:
 			if isinstance(message.content, str):
 				# Regular text content
 				message_parts = [Part.from_text(text=message.content)]
-			elif message.content is not None:
-				# Handle Iterable of content parts
-				for part in message.content:
-					if part.type == 'text':
-						message_parts.append(Part.from_text(text=part.text))
-					elif part.type == 'refusal':
-						message_parts.append(Part.from_text(text=f'[Refusal] {part.refusal}'))
-					elif part.type == 'image_url':
-						# Handle images
-						url = part.image_url.url
-
-						# Format: data:image/png;base64,<data>
-						header, data = url.split(',', 1)
-						# Decode base64 to bytes
-						image_bytes = base64.b64decode(data)
-
-						# Add image part
-						image_part = Part.from_bytes(data=image_bytes, mime_type='image/png')
-
-						message_parts.append(image_part)
+			elif message.content is None or type(message.content).__name__ == 'NotGiven':
+				# No content to add
+				pass
+			else:
+				# Attempt to iterate content safely; if not iterable, coerce to text
+				try:
+					iterator = iter(message.content)
+				except TypeError:
+					message_parts = [Part.from_text(text=str(message.content))]
+				else:
+					for part in iterator:
+						ptype = getattr(part, 'type', None)
+						if ptype == 'text':
+							message_parts.append(Part.from_text(text=getattr(part, 'text', '')))
+						elif ptype == 'refusal':
+							message_parts.append(Part.from_text(text=f"[Refusal] {getattr(part, 'refusal', '')}"))
+						elif ptype == 'image_url':
+							# Handle images safely
+							url_obj = getattr(part, 'image_url', None)
+							url = getattr(url_obj, 'url', '') if url_obj is not None else ''
+							if ',' in url:
+								head, data = url.split(',', 1)
+								try:
+									image_bytes = base64.b64decode(data)
+									image_part = Part.from_bytes(data=image_bytes, mime_type='image/png')
+								except Exception:
+									# Fallback: include URL as text if decode fails
+									image_part = Part.from_text(text=url)
+								message_parts.append(image_part)
+							else:
+								# Not base64 data, store URL as text
+								message_parts.append(Part.from_text(text=url))
+						else:
+							# Unknown part type -> convert to text
+							message_parts.append(Part.from_text(text=str(part)))
 
 			# Create the Content object
 			if message_parts:

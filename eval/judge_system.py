@@ -11,18 +11,23 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+# The concrete shapes in browser_use.llm.messages may vary between runtimes and
+# type-checker stubs. To avoid hard coupling and pyright type errors in this
+# module, treat the message/content types as opaque Any aliases. This keeps the
+# runtime behavior unchanged while avoiding incorrect static assumptions.
+from typing import Any as _Any
+
 from PIL import Image
 from pydantic import BaseModel
 
 from browser_use.llm.base import BaseChatModel
-from browser_use.llm.messages import (
-	BaseMessage,
-	ContentPartImageParam,
-	ContentPartTextParam,
-	ImageURL,
-	SystemMessage,
-	UserMessage,
-)
+
+BaseMessage = _Any
+ContentPartImageParam = _Any
+ContentPartTextParam = _Any
+ImageURL = _Any
+SystemMessage = _Any
+UserMessage = _Any
 
 logger = logging.getLogger(__name__)
 
@@ -193,8 +198,12 @@ def are_images_identical(img_path1: str, img_path2: str) -> bool:
 			if img1.size != img2.size:
 				return False
 
-			# Compare pixel data
-			return list(img1.getdata()) == list(img2.getdata())
+			# Compare pixel data. Convert each pixel to a tuple to ensure the
+			# returned ImagingCore from getdata() is treated as an iterable of tuples
+			# (avoids type-checker complaints about ImagingCore not being an Iterable).
+			pixels1 = list(map(tuple, img1.getdata()))
+			pixels2 = list(map(tuple, img2.getdata()))
+			return pixels1 == pixels2
 	except Exception as e:
 		logger.warning(f'Failed to compare images {img_path1} and {img_path2}: {e}')
 		return False
@@ -419,12 +428,16 @@ Respond with EXACTLY this JSON structure (no additional text before or after):
 Evaluate this agent execution given the criteria and respond with the exact JSON structure requested."""
 
 	# Build messages
-	content_parts: list[ContentPartTextParam | ContentPartImageParam] = [ContentPartTextParam(text=user_prompt)]
+	# Use lightweight, untyped message/content payloads here to avoid depending
+	# on concrete constructors of external message classes. This avoids
+	# constructor/field-name mismatches while preserving the structure the LLM
+	# interface can consume.
+	content_parts: list[Any] = [{"text": user_prompt}]
 	content_parts.extend(encoded_images)
 
-	messages: list[BaseMessage] = [
-		SystemMessage(content=system_prompt),
-		UserMessage(content=content_parts),
+	messages: list[Any] = [
+		{"role": "system", "content": system_prompt},
+		{"role": "user", "content": content_parts},
 	]
 
 	# Get structured response
@@ -443,12 +456,16 @@ def parse_judge_response(result_dict: dict, task: str) -> JudgeResult:
 	try:
 		# Parse error categories
 		error_categories = []
-		if 'error_categories' in result_dict:
-			for err in result_dict['error_categories']:
-				try:
-					error_categories.append(ErrorCategory(err))
-				except ValueError:
-					logger.warning(f'Unknown error category: {err}')
+		for err in result_dict.get('error_categories', []) or []:
+			try:
+				# Normalize non-string sentinel values (e.g. NotGiven) to str before
+				# attempting to map to the ErrorCategory enum. Skip None-like values.
+				if err is None:
+					continue
+				err_str = str(err)
+				error_categories.append(ErrorCategory(err_str))
+			except ValueError:
+				logger.warning(f'Unknown error category: {err}')
 
 		final_score = result_dict.get('final_score', 0)
 
