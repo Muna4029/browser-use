@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from anthropic import (
-	NOT_GIVEN,
 	APIConnectionError,
 	APIStatusError,
 	AsyncAnthropicBedrock,
@@ -157,11 +156,14 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 		try:
 			if output_format is None:
 				# Normal completion without structured output
+				kwargs = self._get_client_params_for_invoke().copy()
+				# Only include system if it was provided as a string (avoid passing NotGiven sentinel)
+				if system_prompt is not None:
+					kwargs['system'] = system_prompt
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
-					**self._get_client_params_for_invoke(),
+					**kwargs,
 				)
 
 				usage = self._get_usage(response)
@@ -199,13 +201,17 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 				# Force the model to use this tool
 				tool_choice = ToolChoiceToolParam(type='tool', name=tool_name)
 
+				# Prepare kwargs and include tools and tool_choice; only include system if provided
+				kwargs = self._get_client_params_for_invoke().copy()
+				kwargs['tools'] = [tool]
+				kwargs['tool_choice'] = tool_choice
+				if system_prompt is not None:
+					kwargs['system'] = system_prompt
+
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
-					tool_choice=tool_choice,
-					**self._get_client_params_for_invoke(),
+					**kwargs,
 				)
 
 				usage = self._get_usage(response)

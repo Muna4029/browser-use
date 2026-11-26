@@ -18,7 +18,6 @@ from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import (
 	BaseMessage,
 	ContentPartImageParam,
-	ContentPartTextParam,
 	ImageURL,
 	SystemMessage,
 	UserMessage,
@@ -193,8 +192,8 @@ def are_images_identical(img_path1: str, img_path2: str) -> bool:
 			if img1.size != img2.size:
 				return False
 
-			# Compare pixel data
-			return list(img1.getdata()) == list(img2.getdata())
+			# Compare pixel data using raw bytes to avoid typing issues with PIL's ImagingCore
+			return img1.tobytes() == img2.tobytes()
 	except Exception as e:
 		logger.warning(f'Failed to compare images {img_path1} and {img_path2}: {e}')
 		return False
@@ -419,12 +418,29 @@ Respond with EXACTLY this JSON structure (no additional text before or after):
 Evaluate this agent execution given the criteria and respond with the exact JSON structure requested."""
 
 	# Build messages
-	content_parts: list[ContentPartTextParam | ContentPartImageParam] = [ContentPartTextParam(text=user_prompt)]
-	content_parts.extend(encoded_images)
+	# Combine the textual prompt and any encoded images into a single textual content
+	content_text = user_prompt
+	if encoded_images:
+		image_texts: list[str] = []
+		for idx, img_part in enumerate(encoded_images, start=1):
+			# Safely extract the data URL if present and append as a placeholder line
+			url = None
+			try:
+				url = getattr(img_part, "image_url", None)
+				if url is not None:
+					url = getattr(url, "url", None)
+			except Exception:
+				url = None
+			if url:
+				image_texts.append(f"[Image {idx}: {url}]")
+			else:
+				image_texts.append(f"[Image {idx}: (unable to extract image data)]")
+		if image_texts:
+			content_text += "\n\n" + "\n".join(image_texts)
 
 	messages: list[BaseMessage] = [
 		SystemMessage(content=system_prompt),
-		UserMessage(content=content_parts),
+		UserMessage(content=content_text),
 	]
 
 	# Get structured response
