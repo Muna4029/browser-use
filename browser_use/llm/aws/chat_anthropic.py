@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from anthropic import (
-	NOT_GIVEN,
 	APIConnectionError,
 	APIStatusError,
 	AsyncAnthropicBedrock,
@@ -160,21 +159,28 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 		try:
 			if output_format is None:
 				# Normal completion without structured output
+				params = self._get_client_params_for_invoke()
+				if system_prompt is not None:
+					params['system'] = system_prompt
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
-					**self._get_client_params_for_invoke(),
+					**params,
 				)
 
 				usage = self._get_usage(response)
 
 				# Extract text from the first content block
 				first_content = response.content[0]
+				response_text = None
 				if isinstance(first_content, TextBlock):
 					response_text = first_content.text
+				elif isinstance(first_content, str):
+					response_text = first_content
+				elif hasattr(first_content, 'text'):
+					response_text = getattr(first_content, 'text')
 				else:
-					# If it's not a text block, convert to string
+					# Fallback to string representation
 					response_text = str(first_content)
 
 				return ChatInvokeCompletion(
@@ -202,32 +208,43 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 				# Force the model to use this tool
 				tool_choice = ToolChoiceToolParam(type='tool', name=tool_name)
 
+				params = self._get_client_params_for_invoke()
+				# include system if provided
+				if system_prompt is not None:
+					params['system'] = system_prompt
+				# include tools and tool_choice
+				params['tools'] = [tool]
+				params['tool_choice'] = tool_choice
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
-					tool_choice=tool_choice,
-					**self._get_client_params_for_invoke(),
+					**params,
 				)
 
 				usage = self._get_usage(response)
 
 				# Extract the tool use block
 				for content_block in response.content:
-					if hasattr(content_block, 'type') and content_block.type == 'tool_use':
+					# Support both dict-like and attribute-like content blocks
+					if isinstance(content_block, dict):
+						cb_type = content_block.get('type')
+						cb_input = content_block.get('input')
+					else:
+						cb_type = getattr(content_block, 'type', None)
+						cb_input = getattr(content_block, 'input', None)
+					if cb_type == 'tool_use':
 						# Parse the tool input as the structured output
 						try:
-							return ChatInvokeCompletion(completion=output_format.model_validate(content_block.input), usage=usage)
-						except Exception as e:
+							return ChatInvokeCompletion(completion=output_format.model_validate(cb_input), usage=usage)
+						except Exception:
 							# If validation fails, try to parse it as JSON first
-							if isinstance(content_block.input, str):
-								data = json.loads(content_block.input)
+							if isinstance(cb_input, str):
+								data = json.loads(cb_input)
 								return ChatInvokeCompletion(
 									completion=output_format.model_validate(data),
 									usage=usage,
 								)
-							raise e
+							raise
 
 				# If no tool use block found, raise an error
 				raise ValueError('Expected tool use in response but none found')

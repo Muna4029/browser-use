@@ -16,7 +16,6 @@ from browser_use.llm.messages import (
 	BaseMessage,
 	ContentPartImageParam,
 	ContentPartTextParam,
-	SupportedImageMediaType,
 	SystemMessage,
 	UserMessage,
 )
@@ -33,7 +32,7 @@ class AnthropicMessageSerializer:
 		return url.startswith('data:image/')
 
 	@staticmethod
-	def _parse_base64_url(url: str) -> tuple[SupportedImageMediaType, str]:
+	def _parse_base64_url(url: str) -> tuple[str, str]:
 		"""Parse a base64 data URL to extract media type and data."""
 		# Format: data:image/jpeg;base64,<data>
 		if not url.startswith('data:'):
@@ -48,7 +47,7 @@ class AnthropicMessageSerializer:
 			# Default to png if not recognized
 			media_type = 'image/png'
 
-		return media_type, data  # type: ignore
+		return media_type, data
 
 	@staticmethod
 	def _serialize_cache_control(use_cache: bool) -> CacheControlEphemeralParam | None:
@@ -171,7 +170,12 @@ class AnthropicMessageSerializer:
 		If a SystemMessage is passed here, it will be converted to a user message.
 		"""
 		if isinstance(message, UserMessage):
-			content = AnthropicMessageSerializer._serialize_content(message.content, use_cache=message.cache)
+			# Ensure content is a supported runtime type before calling serializer
+			msg_content = message.content
+			if not isinstance(msg_content, (str, list)):
+				# If content is missing or a sentinel (e.g. NotGiven), treat as empty string
+				msg_content = ''
+			content = AnthropicMessageSerializer._serialize_content(msg_content, use_cache=message.cache)
 			return MessageParam(role='user', content=content)
 
 		elif isinstance(message, SystemMessage):
@@ -226,8 +230,9 @@ class AnthropicMessageSerializer:
 			else:
 				# Only simplify when no caching and single block
 				single_block = blocks[0]
-				if single_block['type'] == 'text' and not single_block.get('cache_control'):
-					content = single_block['text']
+				# single_block is a TextBlockParam; access attributes directly (use getattr to be defensive)
+				if getattr(single_block, 'type', None) == 'text' and not getattr(single_block, 'cache_control', None):
+					content = getattr(single_block, 'text', '')
 				else:
 					content = blocks
 
@@ -305,8 +310,13 @@ class AnthropicMessageSerializer:
 		# Serialize system message
 		serialized_system_message: list[TextBlockParam] | str | None = None
 		if system_message:
-			serialized_system_message = AnthropicMessageSerializer._serialize_content_to_str(
-				system_message.content, use_cache=system_message.cache
-			)
+			sys_content = system_message.content
+			# Only pass supported runtime types to the serializer (avoid sentinels like NotGiven)
+			if isinstance(sys_content, (str, list)):
+				serialized_system_message = AnthropicMessageSerializer._serialize_content_to_str(
+					sys_content, use_cache=system_message.cache
+				)
+			else:
+				serialized_system_message = None
 
 		return serialized_messages, serialized_system_message
