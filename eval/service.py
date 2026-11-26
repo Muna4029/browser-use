@@ -541,6 +541,8 @@ async def run_agent_with_tracing(
 		# Create task tracker
 		tracker = TaskTracker(task.task_id, task.confirmed_task, run_id)
 
+		# Track whether we created the browser in this function
+		created_browser = browser is None
 		browser = browser or Browser()
 
 		agent = Agent(
@@ -561,8 +563,14 @@ async def run_agent_with_tracing(
 	finally:
 		# Ensure proper cleanup
 		await asyncio.sleep(0.1)  # Give a moment for any pending tasks to complete
-		if not browser:
-			await agent.close()  # This will close the browser if we created it
+		# Only close the agent (and thus the browser it created) if we created the browser here.
+		# Also guard against situations where agent may not have been created.
+		if 'agent' in locals():
+			try:
+				if created_browser:
+					await agent.close()
+			except Exception as e:
+				logger.warning(f'Error closing agent/browser: {type(e).__name__}: {e}')
 
 
 async def judge_task_result(model, task_folder: Path, score_threshold: float = 3) -> dict:
@@ -580,7 +588,8 @@ async def judge_task_result(model, task_folder: Path, score_threshold: float = 3
 		return {'task_id': task_folder.name, 'judgement': None, 'success': False, 'error': 'No result.json found', 'score': 0.0}
 
 	try:
-		async with await anyio.open_file(result_file) as f:
+		# Proper async context manager usage for anyio.open_file
+		async with anyio.open_file(result_file, 'r') as f:
 			result = json.loads(await f.read())
 
 		# If a Online_Mind2Web_evaluation is already saved, we can skip the eval
@@ -615,7 +624,8 @@ async def judge_task_result(model, task_folder: Path, score_threshold: float = 3
 
 			# Save the Online_Mind2Web_evaluation into the result.json file
 			result['Online_Mind2Web_evaluation'] = evaluation
-			with anyio.open_file(result_file, 'w') as f:
+			# Use async context manager for writing as well
+			async with anyio.open_file(result_file, 'w') as f:
 				await f.write(json.dumps(result, indent=2))
 
 			return evaluation
@@ -757,7 +767,8 @@ async def run_task_with_semaphore(
 			if result_file.exists():
 				logger.info(f'Task {task.task_id}: Found existing result file.')
 				try:
-					with anyio.open_file(result_file) as f:
+					# Use async context manager for reading
+					async with anyio.open_file(result_file, 'r') as f:
 						existing_result = json.loads(await f.read())
 
 					# Populate payload from existing file
@@ -821,7 +832,8 @@ async def run_task_with_semaphore(
 
 					# Load the result file that should have just been created
 					if result_file.exists():
-						async with await anyio.open_file(result_file) as f:
+						# Use proper async context manager for reading
+						async with anyio.open_file(result_file, 'r') as f:
 							run_result_data = json.loads(await f.read())
 						server_payload['actionHistory'] = run_result_data.get('action_history', [])
 						server_payload['finalResultResponse'] = run_result_data.get('final_result_response', 'None')

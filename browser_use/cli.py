@@ -799,10 +799,13 @@ class BrowserUseApp(App):
 					model_info.write(f'[white]Avg tokens/step:[/] [green]{avg_tokens_per_step:,.1f}[/]')
 
 					# Get the last step metadata to show the most recent LLM response time
+				# Initialize defaults in case there is no metadata
+				step_duration = 0
+				step_tokens = 0
 				if num_steps > 0 and self.agent.state.history.history[-1].metadata:
 					last_step = self.agent.state.history.history[-1]
-					step_duration = last_step.metadata.duration_seconds
-					step_tokens = last_step.metadata.input_tokens
+					step_duration = getattr(last_step.metadata, 'duration_seconds', 0)
+					step_tokens = getattr(last_step.metadata, 'input_tokens', 0)
 
 					if step_tokens > 0:
 						tokens_per_second = step_tokens / step_duration if step_duration > 0 else 0

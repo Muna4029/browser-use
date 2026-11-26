@@ -8,7 +8,6 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from functools import wraps
 from pathlib import Path
 from typing import Any, Self
 from urllib.parse import urlparse
@@ -67,17 +66,46 @@ def _log_pretty_path(path: Path) -> str:
 
 
 def require_initialization(func):
-	"""decorator for BrowserSession methods to require the BrowserSession be already active"""
+	"""decorator for BrowserSession methods to require the BrowserSession be already active
 
-	@wraps(func)
-	def wrapper(self, *args, **kwargs):
+	This decorator supports being applied to both synchronous and asynchronous methods. If the
+	wrapped function is asynchronous, an async wrapper is returned that awaits the inner
+	function. If the wrapped function is synchronous, a synchronous wrapper is returned. When
+	a new tab must be created and the creation method is asynchronous, the wrapper will run the
+	coroutine appropriately depending on the execution context.
+	"""
+
+	import asyncio as _asyncio
+	import inspect as _inspect
+	from functools import wraps as _wraps
+
+	@_wraps(func)
+	def _sync_wrapper(self, *args, **kwargs):
 		if not self.initialized:
 			raise RuntimeError('BrowserSession(...).start() must be called first to launch or connect to the browser')
-		if not self.agent_current_page or self.agent_current_page.is_closed():
-			self.agent_current_page = self.browser_context.pages[0] if self.browser_context.pages else None
 
 		if not self.agent_current_page or self.agent_current_page.is_closed():
-			self.create_new_tab()
+			self.agent_current_page = self.browser_context.pages[0] if (self.browser_context and self.browser_context.pages) else None
+
+		if not self.agent_current_page or self.agent_current_page.is_closed():
+			# Attempt to create a new tab. create_new_tab may be async.
+			create_new = getattr(self, 'create_new_tab', None)
+			if create_new is None:
+				raise RuntimeError('BrowserSession has no create_new_tab method')
+
+			if _inspect.iscoroutinefunction(create_new):
+				# If there's no running loop, run the coroutine to completion synchronously.
+				try:
+					_asyncio.get_running_loop()
+				except RuntimeError:
+					# No running loop: safe to run the coroutine
+					_asyncio.run(create_new())
+				else:
+					# A running loop exists; synchronous code cannot await. Raise a clear error.
+					raise RuntimeError('Cannot create a new tab synchronously while an event loop is running; call from async context')
+			else:
+				create_new()
+
 			assert self.agent_current_page and not self.agent_current_page.is_closed()
 
 		if not hasattr(self, '_cached_browser_state_summary'):
@@ -85,7 +113,39 @@ def require_initialization(func):
 
 		return func(self, *args, **kwargs)
 
-	return wrapper
+	@_wraps(func)
+	async def _async_wrapper(self, *args, **kwargs):
+		if not self.initialized:
+			raise RuntimeError('BrowserSession(...).start() must be called first to launch or connect to the browser')
+
+		if not self.agent_current_page or self.agent_current_page.is_closed():
+			self.agent_current_page = self.browser_context.pages[0] if (self.browser_context and self.browser_context.pages) else None
+
+		if not self.agent_current_page or self.agent_current_page.is_closed():
+			create_new = getattr(self, 'create_new_tab', None)
+			if create_new is None:
+				raise RuntimeError('BrowserSession has no create_new_tab method')
+
+			if _inspect.iscoroutinefunction(create_new):
+				await create_new()
+			else:
+				# synchronous create_new_tab
+				create_new()
+
+			assert self.agent_current_page and not self.agent_current_page.is_closed()
+
+		if not hasattr(self, '_cached_browser_state_summary'):
+			raise RuntimeError('BrowserSession(...).start() must be called first to initialize the browser session')
+
+		# Call the wrapped function appropriately depending on its type
+		if _inspect.iscoroutinefunction(func):
+			return await func(self, *args, **kwargs)
+		else:
+			return func(self, *args, **kwargs)
+
+	# Return an async wrapper when the wrapped function is async, otherwise a sync wrapper
+	import inspect as _ins
+	return _async_wrapper if _ins.iscoroutinefunction(func) else _sync_wrapper
 
 
 DEFAULT_BROWSER_PROFILE = BrowserProfile()
@@ -711,8 +771,10 @@ class BrowserSession(BaseModel):
 
 	def _set_browser_keep_alive(self, keep_alive: bool | None) -> None:
 		"""set the keep_alive flag on the browser_profile, defaulting to True if keep_alive is None"""
+		# Only set if not already specified on the profile.
 		if self.browser_profile.keep_alive is None:
-			self.browser_profile.keep_alive = keep_alive
+			# If caller didn't provide a preference, default to True as documented.
+			self.browser_profile.keep_alive = True if keep_alive is None else keep_alive
 
 	# --- Tab management ---
 	async def get_current_page(self) -> Page:
@@ -1389,6 +1451,7 @@ class BrowserSession(BaseModel):
 		return structure
 
 	@time_execution_sync('--get_state_summary')  # This decorator might need to be updated to handle async
+	@time_execution_async('--get_state_summary')
 	async def get_state_summary(self, cache_clickable_elements_hashes: bool) -> BrowserStateSummary:
 		"""Get a summary of the current browser state
 
@@ -1530,7 +1593,7 @@ class BrowserSession(BaseModel):
 	# region - User Actions
 
 	@staticmethod
-	async def _get_unique_filename(directory: str, filename: str) -> str:
+	def _get_unique_filename(directory: str, filename: str) -> str:
 		"""Generate a unique filename for downloads by appending (1), (2), etc., if a file already exists."""
 		base, ext = os.path.splitext(filename)
 		counter = 1
