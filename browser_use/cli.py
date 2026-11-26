@@ -804,6 +804,8 @@ class BrowserUseApp(App):
 
 				# Calculate tokens per step
 				num_steps = len(self.agent.state.history.history)
+				# Ensure step_duration is always defined to avoid UnboundLocalError
+				step_duration = 0.0
 				# if num_steps > 0:
 				# avg_tokens_per_step = total_tokens / num_steps
 				# model_info.write(f'[white]Avg tokens/step:[/] [green]{avg_tokens_per_step:,.1f}[/]')

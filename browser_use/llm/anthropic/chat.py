@@ -9,7 +9,6 @@ from anthropic import (
 	APIConnectionError,
 	APIStatusError,
 	AsyncAnthropic,
-	NotGiven,
 	RateLimitError,
 )
 from anthropic.types import CacheControlEphemeralParam, Message, ToolParam
@@ -44,7 +43,7 @@ class ChatAnthropic(BaseChatModel):
 	api_key: str | None = None
 	auth_token: str | None = None
 	base_url: str | httpx.URL | None = None
-	timeout: float | Timeout | None | NotGiven = NotGiven()
+	timeout: float | Timeout | None = None
 	max_retries: int = 10
 	default_headers: Mapping[str, str] | None = None
 	default_query: Mapping[str, object] | None = None
@@ -70,7 +69,8 @@ class ChatAnthropic(BaseChatModel):
 		# Create client_params dict with non-None values and non-NotGiven values
 		client_params = {}
 		for k, v in base_params.items():
-			if v is not None and v is not NotGiven():
+			# Use the exported NOT_GIVEN sentinel for identity checks instead of constructing a new NotGiven()
+			if v is not None and v is not NOT_GIVEN:
 				client_params[k] = v
 
 		return client_params
@@ -133,7 +133,7 @@ class ChatAnthropic(BaseChatModel):
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
+					system=system_prompt if system_prompt is not None else None,
 					**self._get_client_params_for_invoke(),
 				)
 
@@ -176,7 +176,7 @@ class ChatAnthropic(BaseChatModel):
 					model=self.model,
 					messages=anthropic_messages,
 					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
+					system=system_prompt if system_prompt is not None else None,
 					tool_choice=tool_choice,
 					**self._get_client_params_for_invoke(),
 				)
