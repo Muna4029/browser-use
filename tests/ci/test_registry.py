@@ -48,15 +48,15 @@ class TestContext:
 class SimpleParams(BaseActionModel):
 	"""Simple parameter model"""
 
-	value: str = Field(description='Test value')
+	value: str = Field(description='Test value')  # type: ignore
 
 
 class ComplexParams(BaseActionModel):
 	"""Complex parameter model with multiple fields"""
 
-	text: str = Field(description='Text input')
-	number: int = Field(description='Number input', default=42)
-	optional_flag: bool = Field(description='Optional boolean', default=False)
+	text: str = Field(description='Text input')  # type: ignore
+	number: int = Field(description='Number input', default=42)  # type: ignore
+	optional_flag: bool = Field(description='Optional boolean', default=False)  # type: ignore
 
 
 # Test fixtures
@@ -132,6 +132,7 @@ class TestActionRegistryParameterPatterns:
 		@registry.action('Action with individual params and browser')
 		async def action_with_browser(text: str, browser_session: BrowserSession):
 			page = await browser_session.get_current_page()
+			assert page is not None
 			return ActionResult(extracted_content=f'Text: {text}, URL: {page.url}')
 
 		# Navigate to test page first
@@ -189,6 +190,7 @@ class TestActionRegistryParameterPatterns:
 		@registry.action('Action with pydantic model', param_model=ComplexParams)
 		async def pydantic_action(params: ComplexParams, browser_session: BrowserSession):
 			page = await browser_session.get_current_page()
+			assert page is not None
 			return ActionResult(
 				extracted_content=f'Text: {params.text}, Number: {params.number}, Flag: {params.optional_flag}, URL: {page.url}'
 			)
@@ -268,11 +270,13 @@ class TestActionRegistryParameterPatterns:
 		@registry.action('Action with legacy browser param')
 		async def legacy_browser_action(text: str, browser: BrowserSession):
 			page = await browser.get_current_page()
+			assert page is not None
 			return ActionResult(extracted_content=f'Legacy browser: {text}, URL: {page.url}')
 
 		@registry.action('Action with legacy browser_context param')
 		async def legacy_context_action(text: str, browser_context: BrowserSession):
 			page = await browser_context.get_current_page()
+			assert page is not None
 			return ActionResult(extracted_content=f'Legacy context: {text}, URL: {page.url}')
 
 		# Test legacy browser parameter
@@ -305,6 +309,7 @@ class TestActionRegistryParameterPatterns:
 		@registry.action('Action with browser_session parameter')
 		async def browser_session_action(text: str, browser_session: BrowserSession):
 			page = await browser_session.get_current_page()
+			assert page is not None
 			return ActionResult(extracted_content=f'Browser session: {text}, URL: {page.url}')
 
 		# Test direct page parameter
@@ -321,7 +326,7 @@ class TestActionRegistryParameterPatterns:
 
 		# Verify both patterns work with pydantic models too
 		class PageActionParams(BaseActionModel):
-			message: str = Field(..., description='Test message')
+			message: str = Field(..., description='Test message')  # type: ignore
 
 		@registry.action('Pydantic action with page', param_model=PageActionParams)
 		async def pydantic_page_action(params: PageActionParams, page: Page):
@@ -342,6 +347,7 @@ class TestActionToActionCalling:
 		# Helper function that actions can call
 		async def helper_function(browser_session: BrowserSession, data: str):
 			page = await browser_session.get_current_page()
+			assert page is not None
 			return f'Helper processed: {data} on {page.url}'
 
 		@registry.action('First action')
@@ -372,6 +378,7 @@ class TestActionToActionCalling:
 		# Simulate the _select_cell_or_range helper function
 		async def _select_cell_or_range(browser_session: BrowserSession, cell_or_range: str):
 			page = await browser_session.get_current_page()
+			assert page is not None
 			return ActionResult(extracted_content=f'Selected cell {cell_or_range} on {page.url}')
 
 		@registry.action('Select cell or range')
@@ -423,6 +430,7 @@ class TestActionToActionCalling:
 		@registry.action('Base action')
 		async def base_action(value: str, browser_session: BrowserSession):
 			page = await browser_session.get_current_page()
+			assert page is not None
 			return ActionResult(extracted_content=f'Base: {value} on {page.url}')
 
 		@registry.action('Middle action')
@@ -1103,7 +1111,7 @@ class TestParamsModelArgsAndKwargs:
 
 		# Model that doesn't include browser_session (renamed to avoid pytest collecting it)
 		class CellActionParams(ActionModel):
-			value: str = Field(description='Test value')
+			value: str = Field(description='Test value')  # type: ignore
 
 		# Model that includes browser_session
 		class ModelWithBrowser(ActionModel):
@@ -1112,7 +1120,7 @@ class TestParamsModelArgsAndKwargs:
 
 		# Create a custom param model for select_cell_or_range
 		class CellRangeParams(ActionModel):
-			cell_or_range: str = Field(description='Cell or range to select')
+			cell_or_range: str = Field(description='Cell or range to select')  # type: ignore
 
 		# Use the provided real browser session
 

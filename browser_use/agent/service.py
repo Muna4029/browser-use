@@ -1045,10 +1045,11 @@ class Agent(Generic[Context]):
 					for action in item.model_output.action
 					if action  # Ensure action is not None if list allows it
 				]
+				# Always append a list (possibly empty) to keep a homogeneous type: list[list[dict]]
 				action_history_data.append(step_actions)
 			else:
-				# Append None or [] if a step had no actions or no model output
-				action_history_data.append(None)
+				# Append empty list if a step had no actions or no model output to preserve type
+				action_history_data.append([])
 
 		final_res = self.state.history.final_result()
 		final_result_str = json.dumps(final_res) if final_res is not None else None
@@ -1069,7 +1070,8 @@ class Agent(Generic[Context]):
 				action_history=action_history_data,
 				urls_visited=self.state.history.urls(),
 				steps=self.state.n_steps,
-				total_input_tokens=token_summary.prompt_tokens,
+				# Guard against token_summary being None
+				total_input_tokens=(token_summary.prompt_tokens if token_summary is not None else None),
 				total_duration_seconds=self.state.history.total_duration_seconds(),
 				success=self.state.history.is_successful(),
 				final_result_response=final_result_str,
@@ -1610,20 +1612,35 @@ class Agent(Generic[Context]):
 			*self._message_manager.get_messages()[1:],  # Use full message history except the first
 		]
 
+		# If vision is enabled generally but disabled for planner, sanitize all non-system messages
 		if not self.settings.use_vision_for_planner and self.settings.use_vision:
-			last_state_message: UserMessage = planner_messages[-1]
-			# remove image from last state message
-			new_msg = ''
-			if isinstance(last_state_message.content, list):
-				for msg in last_state_message.content:
-					if msg.type == 'text':
-						new_msg += msg.text
-					elif msg.type == 'image_url':
-						continue
-			else:
-				new_msg = last_state_message.content
+			sanitized_messages: list = []
+			for idx, msg in enumerate(planner_messages):
+				# Keep the system message as-is (first message)
+				if idx == 0:
+					sanitized_messages.append(msg)
+					continue
 
-			planner_messages[-1] = UserMessage(content=new_msg)
+				content = getattr(msg, 'content', None)
+				# If content is a list of parts (e.g., Content objects), extract only textual parts
+				if isinstance(content, list):
+					new_msg_text = ''
+					for part in content:
+						part_type = getattr(part, 'type', None)
+						# include only textual parts
+						if part_type == 'text':
+							new_msg_text += getattr(part, 'text', '')
+						# skip images and other non-text parts
+					# Create a sanitized UserMessage
+					sanitized_messages.append(UserMessage(content=new_msg_text))
+				else:
+					# If content is already a string, keep it. Otherwise, coerce to string safely.
+					if isinstance(content, str) or content is None:
+						sanitized_messages.append(msg)
+					else:
+						sanitized_messages.append(UserMessage(content=str(content)))
+
+			planner_messages = sanitized_messages
 
 		# Get planner output
 		try:

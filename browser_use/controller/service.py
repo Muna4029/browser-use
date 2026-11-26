@@ -1184,23 +1184,32 @@ Explain the content of the page and that the requested information is not availa
 		available_file_paths: list[str] | None = None,
 		file_system: FileSystem | None = None,
 		#
-		context: Context | None = None,
+		context: object | None = None,
 	) -> ActionResult:
 		"""Execute an action"""
 
 		for action_name, params in action.model_dump(exclude_unset=True).items():
 			if params is not None:
-				# with Laminar.start_as_current_span(
-				# 	name=action_name,
-				# 	input={
-				# 		'action': action_name,
-				# 		'params': params,
-				# 	},
-				# 	span_type='TOOL',
-				# ):
+				# sanitize params to avoid forwarding pydantic "NotGiven" sentinel into strongly-typed calls
+				sanitized_params = params
+				if isinstance(params, dict):
+					_sanitized: dict[str, object] = {}
+					for k, v in params.items():
+						# Filter values that are pydantic's NotGiven sentinel (best-effort detection)
+						try:
+							if repr(v) == "NotGiven" or "NotGiven" in repr(v):
+								continue
+						except Exception:
+							pass
+						# Extra defensive check: class name match
+						if getattr(v, "__class__", None) and getattr(v.__class__, "__name__", "") == "NotGiven":
+							continue
+						_sanitized[k] = v
+					sanitized_params = _sanitized
+
 				result = await self.registry.execute_action(
 					action_name=action_name,
-					params=params,
+					params=sanitized_params,
 					browser_session=browser_session,
 					page_extraction_llm=page_extraction_llm,
 					file_system=file_system,
@@ -1218,5 +1227,9 @@ Explain the content of the page and that the requested information is not availa
 				elif result is None:
 					return ActionResult()
 				else:
-					raise ValueError(f'Invalid action result type: {type(result)} of {result}')
+					# Best-effort wrapping for other content-like results to avoid type mismatches
+					try:
+						return ActionResult(extracted_content=str(result))
+					except Exception:
+						raise ValueError(f'Invalid action result type: {type(result)} of {result}')
 		return ActionResult()

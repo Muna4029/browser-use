@@ -263,7 +263,7 @@ class Registry(Generic[Context]):
 		sig = signature(function)
 		special_param_names = set(SpecialActionParameters.model_fields.keys())
 		params = {
-			name: (param.annotation, ... if param.default == param.empty else param.default)
+			name: (param.annotation, ... if param.default == Parameter.empty else param.default)
 			for name, param in sig.parameters.items()
 			if name not in special_param_names
 		}

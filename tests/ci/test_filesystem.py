@@ -271,7 +271,9 @@ class TestFileSystem:
 		result = await fs.write_file('new_file.txt', 'New file content')
 		assert result == 'Data written to file new_file.txt successfully.'
 		assert 'new_file.txt' in fs.files
-		assert fs.get_file('new_file.txt').content == 'New file content'
+		file_obj = fs.get_file('new_file.txt')
+		assert file_obj is not None
+		assert file_obj.content == 'New file content'
 
 		# Write with invalid filename
 		result = await fs.write_file('invalid@name.md', 'content')
@@ -428,10 +430,9 @@ class TestFileSystem:
 		file_obj = fs2.get_file('custom.txt')
 		assert file_obj is not None
 		assert file_obj.content == 'Custom content'
-		assert (
-			fs2.get_file('extracted_content_0.md').content is not None
-			and fs2.get_file('extracted_content_0.md').content == 'Extracted data'
-		)
+		file_obj = fs2.get_file('extracted_content_0.md')
+		assert file_obj is not None
+		assert file_obj.content is not None and file_obj.content == 'Extracted data'
 
 		# Verify files exist on disk
 		assert (fs2.data_dir / 'results.md').exists()
