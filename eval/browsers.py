@@ -112,7 +112,8 @@ def create_browserbase_session() -> str:
 			proxies=True,
 		)
 
-		return session.connect_url
+		# Coerce to str to satisfy static type-checkers in case the library returns a sentinel/optional
+		return str(session.connect_url or '')
 
 	except Exception as e:
 		logger.error(f'Failed to create Browserbase session: {type(e).__name__}: {e}')
@@ -143,7 +144,8 @@ async def create_hyperbrowser_session() -> str:
 
 		await client.close()
 
-		return session.ws_endpoint or ''
+		# Ensure return type is str for static type checkers (handle sentinel/optional values)
+		return str(session.ws_endpoint or '')
 
 	except Exception as e:
 		logger.error(f'Failed to create Hyperbrowser session: {type(e).__name__}: {e}')
@@ -296,12 +298,18 @@ async def _retry_browser_creation(browser_func, max_retries: int = 3, *args, **k
 				return await asyncio.to_thread(browser_func, *args, **kwargs)
 		except Exception as e:
 			if attempt == max_retries - 1:  # Last attempt
-				raise RuntimeError(f'Failed to create browser session after {max_retries} attempts: {type(e).__name__}: {e}')
-			
+				raise RuntimeError(
+					f"Failed to create browser session after {max_retries} attempts: "
+					f"{type(e).__name__}: {e}"
+				)
+
 			wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
-			logger.warning(f'Browser creation attempt {attempt + 1} failed: {type(e).__name__}: {e}. Retrying in {wait_time}s...')
+			logger.warning(
+				f"Browser creation attempt {attempt + 1} failed: {type(e).__name__}: {e}. "
+				f"Retrying in {wait_time}s..."
+			)
 			await asyncio.sleep(wait_time)
-	
+
 	raise RuntimeError(f'Failed to create browser session after {max_retries} attempts')
 
 

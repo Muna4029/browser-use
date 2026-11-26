@@ -18,7 +18,6 @@ from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import (
 	BaseMessage,
 	ContentPartImageParam,
-	ContentPartTextParam,
 	ImageURL,
 	SystemMessage,
 	UserMessage,
@@ -195,8 +194,12 @@ def are_images_identical(img_path1: str, img_path2: str) -> bool:
 			if img1.size != img2.size:
 				return False
 
-			# Compare pixel data
-			return list(img1.getdata()) == list(img2.getdata())
+			# Compare raw byte content which avoids typing issues with ImagingCore in stubs
+			try:
+				return img1.tobytes() == img2.tobytes()
+			except Exception:
+				# Fallback to pixel-by-pixel comparison if tobytes is not available
+				return list(img1.getdata()) == list(img2.getdata())
 	except Exception as e:
 		logger.warning(f'Failed to compare images {img_path1} and {img_path2}: {e}')
 		return False
@@ -423,12 +426,22 @@ Respond with EXACTLY this JSON structure (no additional text before or after):
 Evaluate this agent execution given the criteria and respond with the exact JSON structure requested."""
 
 	# Build messages
-	content_parts: list[ContentPartTextParam | ContentPartImageParam] = [ContentPartTextParam(text=user_prompt)]
-	content_parts.extend(encoded_images)
+	# The model's message content fields expect plain strings. Embed any encoded images
+	# as data-urls into the user prompt text to avoid passing typed ContentPart objects
+	user_message_content = user_prompt
+	if encoded_images:
+		# encoded_images may contain objects with image_url.url; extract them safely
+		image_entries: list[str] = []
+		for idx, img_param in enumerate(encoded_images, start=1):
+			url = getattr(getattr(img_param, "image_url", None), "url", None)
+			if url:
+				image_entries.append(f"[SCREENSHOT {idx}] {url}")
+		if image_entries:
+			user_message_content = user_message_content + "\n\nIMAGES:\n" + "\n".join(image_entries)
 
 	messages: list[BaseMessage] = [
 		SystemMessage(content=system_prompt),
-		UserMessage(content=content_parts),
+		UserMessage(content=user_message_content),
 	]
 
 	# Get structured response

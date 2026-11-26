@@ -890,12 +890,54 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		else:
 			interacted_elements = [None]
 
+		# Normalize screenshot data so it is compatible with BrowserStateHistory
+		screenshot_raw = browser_state_summary.screenshot
+		screenshot_data: object
+		if screenshot_raw is None:
+			screenshot_data = None
+		else:
+			# Convert common image-like objects to bytes (an iterable) to satisfy type expectations
+			try:
+				from io import BytesIO
+
+				if isinstance(screenshot_raw, (bytes, bytearray)):
+					screenshot_data = bytes(screenshot_raw)
+				else:
+					# PIL Images and similar have a .save method
+					if hasattr(screenshot_raw, "save") and callable(getattr(screenshot_raw, "save")):
+						buf = BytesIO()
+						try:
+							screenshot_raw.save(buf, format="PNG")
+							buf.seek(0)
+							screenshot_data = buf.getvalue()
+						except Exception:
+							# Fallbacks
+							if hasattr(screenshot_raw, "tobytes"):
+								screenshot_data = screenshot_raw.tobytes()
+							else:
+								try:
+									screenshot_data = bytes(screenshot_raw)
+								except Exception:
+									screenshot_data = screenshot_raw
+						else:
+						# Non-image iterable/object - try to coerce to bytes or keep as-is
+						if hasattr(screenshot_raw, "tobytes"):
+							screenshot_data = screenshot_raw.tobytes()
+						else:
+							try:
+								screenshot_data = bytes(screenshot_raw)
+							except Exception:
+								screenshot_data = screenshot_raw
+			except Exception:
+				# If normalization fails, keep the original value to avoid losing data
+				screenshot_data = screenshot_raw
+
 		state_history = BrowserStateHistory(
 			url=browser_state_summary.url,
 			title=browser_state_summary.title,
 			tabs=browser_state_summary.tabs,
 			interacted_element=interacted_elements,
-			screenshot=browser_state_summary.screenshot,
+			screenshot=screenshot_data,
 		)
 
 		history_item = AgentHistory(
@@ -926,16 +968,38 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			response = await self.llm.ainvoke(input_messages, output_format=self.AgentOutput)
 			parsed = response.completion
 
-			# cut the number of actions to max_actions_per_step if needed
-			if len(parsed.action) > self.settings.max_actions_per_step:
-				parsed.action = parsed.action[: self.settings.max_actions_per_step]
+			# Normalize parsed.action to a list-like sequence to avoid NotGiven/None issues
+			actions = getattr(parsed, "action", None)
+			if actions is None:
+				actions = []
+			elif not isinstance(actions, (list, tuple)):
+				try:
+					actions = list(actions)
+				except Exception:
+					actions = [actions]
+
+			# Normalize max_actions_per_step from settings (defensive for NotGiven or unexpected types)
+			max_actions_val = getattr(self.settings, "max_actions_per_step", None)
+			try:
+				max_actions = int(max_actions_val) if max_actions_val is not None else None
+			except Exception:
+				max_actions = None
+
+			if max_actions is not None and len(actions) > max_actions:
+				actions = actions[:max_actions]
+			parsed.action = actions
+
+			# Safe retrieval of registry for logging (defensive against missing/NotGiven attributes)
+			registry_obj = None
+			if getattr(self, "controller", None) is not None and getattr(self.controller, "registry", None) is not None:
+				registry_obj = getattr(self.controller.registry, "registry", None)
 
 			if not (hasattr(self.state, 'paused') and (self.state.paused or self.state.stopped)):
-				log_response(parsed, self.controller.registry.registry, self.logger)
+				log_response(parsed, registry_obj, self.logger)
 
 			self._log_next_action_summary(parsed)
 			return parsed
-		except ValidationError as e:
+		except ValidationError:
 			# Just re-raise - Pydantic's validation errors are already descriptive
 			raise
 
@@ -1037,25 +1101,64 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 				action_history_data.append(None)
 
 		final_res = self.state.history.final_result()
-		final_result_str = json.dumps(final_res) if final_res is not None else None
+		# Make final_result serializable; fall back to string if json.dumps fails
+		if final_res is None:
+			final_result_str = None
+		else:
+			try:
+				final_result_str = json.dumps(final_res)
+			except Exception:
+				final_result_str = str(final_res)
+
+		# Helper to coerce values to strings or None to avoid assigning pydantic NotGiven to str fields
+		def _normalize_str(val: object) -> str | None:
+			if val is None:
+				return None
+			if isinstance(val, str):
+				return val
+			try:
+				return str(val)
+			except Exception:
+				return None
+
+		# Normalize planner_llm.model access defensively
+		planner_llm_model = None
+		planner_obj = getattr(self.settings, "planner_llm", None)
+		if planner_obj is not None:
+			planner_llm_model = _normalize_str(getattr(planner_obj, "model", planner_obj))
+
+		# Normalize simple fields
+		model_str = _normalize_str(getattr(self.llm, "model", None))
+		provider_str = _normalize_str(getattr(self.llm, "provider", None))
+		version_str = _normalize_str(self.version)
+		source_str = _normalize_str(self.source)
+
+		# Normalize numeric/boolean settings defensively
+		try:
+			max_actions_per_step_val = int(getattr(self.settings, "max_actions_per_step", 0))
+		except Exception:
+			max_actions_per_step_val = None
+
+		use_vision_val = bool(getattr(self.settings, "use_vision", False))
+		use_validation_val = bool(getattr(self.settings, "validate_output", False))
 
 		self.telemetry.capture(
 			AgentTelemetryEvent(
 				task=self.task,
-				model=self.llm.model,
-				model_provider=self.llm.provider,
-				planner_llm=self.settings.planner_llm.model if self.settings.planner_llm else None,
+				model=model_str,
+				model_provider=provider_str,
+				planner_llm=planner_llm_model,
 				max_steps=max_steps,
-				max_actions_per_step=self.settings.max_actions_per_step,
-				use_vision=self.settings.use_vision,
-				use_validation=self.settings.validate_output,
-				version=self.version,
-				source=self.source,
+				max_actions_per_step=max_actions_per_step_val,
+				use_vision=use_vision_val,
+				use_validation=use_validation_val,
+				version=version_str,
+				source=source_str,
 				action_errors=self.state.history.errors(),
 				action_history=action_history_data,
 				urls_visited=self.state.history.urls(),
 				steps=self.state.n_steps,
-				total_input_tokens=token_summary.prompt_tokens,
+				total_input_tokens=getattr(token_summary, "prompt_tokens", None),
 				total_duration_seconds=self.state.history.total_duration_seconds(),
 				success=self.state.history.is_successful(),
 				final_result_response=final_result_str,

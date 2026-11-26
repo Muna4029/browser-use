@@ -44,7 +44,7 @@ class ChatAnthropic(BaseChatModel):
 	api_key: str | None = None
 	auth_token: str | None = None
 	base_url: str | httpx.URL | None = None
-	timeout: float | Timeout | None | NotGiven = NotGiven()
+	timeout: float | Timeout | None | NotGiven = NOT_GIVEN
 	max_retries: int = 10
 	default_headers: Mapping[str, str] | None = None
 	default_query: Mapping[str, object] | None = None
@@ -67,10 +67,11 @@ class ChatAnthropic(BaseChatModel):
 			'default_query': self.default_query,
 		}
 
-		# Create client_params dict with non-None values and non-NotGiven values
+		# Create client_params dict with non-None values and non-NotGiven sentinel
 		client_params = {}
 		for k, v in base_params.items():
-			if v is not None and v is not NotGiven():
+			# Use identity comparison against the NOT_GIVEN sentinel
+			if v is not None and v is not NOT_GIVEN:
 				client_params[k] = v
 
 		return client_params
@@ -130,12 +131,14 @@ class ChatAnthropic(BaseChatModel):
 		try:
 			if output_format is None:
 				# Normal completion without structured output
-				response = await self.get_client().messages.create(
-					model=self.model,
-					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
+				invoke_params = {
+					'model': self.model,
+					'messages': anthropic_messages,
 					**self._get_client_params_for_invoke(),
-				)
+				}
+				if system_prompt is not NOT_GIVEN:
+					invoke_params['system'] = system_prompt
+				response = await self.get_client().messages.create(**invoke_params)
 
 				usage = self._get_usage(response)
 
@@ -172,14 +175,16 @@ class ChatAnthropic(BaseChatModel):
 				# Force the model to use this tool
 				tool_choice = ToolChoiceToolParam(type='tool', name=tool_name)
 
-				response = await self.get_client().messages.create(
-					model=self.model,
-					messages=anthropic_messages,
-					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
-					tool_choice=tool_choice,
+				invoke_params = {
+					'model': self.model,
+					'messages': anthropic_messages,
+					'tools': [tool],
+					'tool_choice': tool_choice,
 					**self._get_client_params_for_invoke(),
-				)
+				}
+				if system_prompt is not NOT_GIVEN:
+					invoke_params['system'] = system_prompt
+				response = await self.get_client().messages.create(**invoke_params)
 
 				usage = self._get_usage(response)
 
