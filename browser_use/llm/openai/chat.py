@@ -33,7 +33,7 @@ class ChatOpenAI(BaseChatModel):
 
 	# Model params
 	temperature: float | None = None
-	reasoning_effort: str = 'low'
+	reasoning_effort: Any = 'low'
 
 	# Client initialization parameters
 	api_key: str | None = None
@@ -131,6 +131,7 @@ class ChatOpenAI(BaseChatModel):
 		"""
 
 		openai_messages = OpenAIMessageSerializer.serialize_messages(messages)
+		import json
 
 		try:
 			if output_format is None:
@@ -143,8 +144,20 @@ class ChatOpenAI(BaseChatModel):
 				)
 
 				usage = self._get_usage(response)
+				raw_content = response.choices[0].message.content
+				# Normalize content into a string for callers
+				if raw_content is None:
+					content_str = ''
+				elif isinstance(raw_content, str):
+					content_str = raw_content
+				else:
+					try:
+						content_str = json.dumps(raw_content)
+					except Exception:
+						content_str = str(raw_content)
+
 				return ChatInvokeCompletion(
-					completion=response.choices[0].message.content or '',
+					completion=content_str,
 					usage=usage,
 				)
 
@@ -164,7 +177,8 @@ class ChatOpenAI(BaseChatModel):
 					response_format=ResponseFormatJSONSchema(json_schema=response_format, type='json_schema'),
 				)
 
-				if response.choices[0].message.content is None:
+				raw_content = response.choices[0].message.content
+				if raw_content is None:
 					raise ModelProviderError(
 						message='Failed to parse structured output from model response',
 						status_code=500,
@@ -173,7 +187,16 @@ class ChatOpenAI(BaseChatModel):
 
 				usage = self._get_usage(response)
 
-				parsed = output_format.model_validate_json(response.choices[0].message.content)
+				# Ensure we pass a JSON string into model_validate_json
+				if isinstance(raw_content, str):
+					content_json = raw_content
+				else:
+					try:
+						content_json = json.dumps(raw_content)
+					except Exception:
+						content_json = str(raw_content)
+
+				parsed = output_format.model_validate_json(content_json)
 
 				return ChatInvokeCompletion(
 					completion=parsed,

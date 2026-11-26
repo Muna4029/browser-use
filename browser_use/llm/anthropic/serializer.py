@@ -226,8 +226,9 @@ class AnthropicMessageSerializer:
 			else:
 				# Only simplify when no caching and single block
 				single_block = blocks[0]
-				if single_block['type'] == 'text' and not single_block.get('cache_control'):
-					content = single_block['text']
+				# Use attribute access on typed block objects (they are not dicts)
+				if getattr(single_block, 'type', None) == 'text' and not getattr(single_block, 'cache_control', None):
+					content = getattr(single_block, 'text', '')
 				else:
 					content = blocks
 
