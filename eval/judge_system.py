@@ -63,7 +63,7 @@ import base64
 import io
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -734,8 +734,22 @@ async def evaluate_task_with_comprehensive_judge(task_folder: Path, model: BaseC
 			max_images=max_images,
 		)
 
-		# Convert to dict for storage
-		judge_dict = asdict(judge_result)
+		# Convert to dict for storage in a safe way (supports dicts, dataclasses, and objects)
+		import dataclasses
+		if isinstance(judge_result, dict):
+			judge_dict = judge_result
+		elif dataclasses.is_dataclass(judge_result):
+			judge_dict = dataclasses.asdict(judge_result)
+		else:
+			# Fallback: try to use __dict__ or repr as a last resort
+			try:
+				judge_dict = dict(getattr(judge_result, "__dict__", {}))
+				if not judge_dict:
+					# If object has no __dict__, attempt to convert common mapping-like interfaces
+					if hasattr(judge_result, "to_dict"):
+						judge_dict = judge_result.to_dict()
+			except Exception:
+				judge_dict = {"repr": repr(judge_result)}
 
 		# Save back to result file using async wrapper
 		result_data['comprehensive_judge_evaluation'] = judge_dict

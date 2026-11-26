@@ -532,12 +532,12 @@ class TaskResult:
 	confirmed_task: str
 	task: Any
 	max_steps: int
-	laminar_link: str | None = None
-	completed_stages: set[Stage] = field(default_factory=set)
-	stage_data: dict[Stage, Any] = field(default_factory=dict)
-	errors: list = field(default_factory=list)
+	laminar_link: Optional[str] = None
+	completed_stages: Set[Stage] = field(default_factory=set)
+	stage_data: Dict[Stage, Any] = field(default_factory=dict)
+	errors: List[Any] = field(default_factory=list)
 	cancelled: bool = False
-	critical_error: str | None = None
+	critical_error: Optional[str] = None
 	server_save_failed: bool = False
 
 	def stage_completed(self, stage: Stage, data: Any = None):
@@ -562,7 +562,7 @@ class TaskResult:
 		return Stage.RUN_AGENT in self.completed_stages or Stage.FORMAT_HISTORY in self.completed_stages
 
 	@property
-	def server_payload(self) -> dict[str, Any]:
+	def server_payload(self) -> Dict[str, Any]:
 		"""Generate payload for server submission"""
 		payload = {
 			'taskId': self.task_id,
@@ -640,7 +640,7 @@ class TaskResult:
 		assert isinstance(serialized_payload, dict), 'Payload serialization should preserve dict structure'
 		return serialized_payload
 
-	def get_local_status(self) -> dict[str, Any]:
+	def get_local_status(self) -> Dict[str, Any]:
 		"""Get local status summary"""
 		success = (
 			Stage.EVALUATE in self.completed_stages
@@ -655,6 +655,12 @@ class TaskResult:
 			'completed_stages': [stage.value for stage in self.completed_stages],
 		}
 
+
+from typing import Any
+
+# LLM/chat model imports used by get_llm and type annotations
+from langchain.chat_models import ChatAnthropic, ChatGoogle, ChatOpenAI
+from langchain.schema import BaseChatModel
 
 from browser_use import ActionResult, Agent, BrowserProfile, BrowserSession, Controller
 from browser_use.agent.memory import MemoryConfig
@@ -865,40 +871,40 @@ def get_llm(model_name: str):
 		)
 		api_key = None
 
-	match provider:
-		case 'openai':
-			kwargs = {'model': config['model_name'], 'temperature': 0.0}
-			# Must set temperatue=1 if model is gpt-o4-mini
-			if model_name == 'gpt-o4-mini':
-				kwargs['temperature'] = 1
-			if api_key:
-				kwargs['api_key'] = api_key
-			return ChatOpenAI(**kwargs)
-		case 'anthropic':
-			kwargs = {
-				'model': config['model_name'],
-				'temperature': 0.0,
-				'timeout': 100,
-			}
-			if api_key:
-				kwargs['api_key'] = api_key
-			return ChatAnthropic(**kwargs)
-		case 'google':
-			kwargs = {'model': config['model_name'], 'temperature': 0.0}
-			if api_key:
-				kwargs['api_key'] = api_key
-			return ChatGoogle(**kwargs)
-		case 'openai_compatible':
-			kwargs = {'model': config['model_name'], 'base_url': config['base_url'], 'temperature': 0.0}
-			if api_key:
-				kwargs['api_key'] = api_key
-			elif config.get('base_url'):
-				logger.warning(
-					f'API key for {model_name} at {config["base_url"]} is missing, but base_url is specified. Authentication may fail.'
-				)
-			return ChatOpenAI(**kwargs)
-		case _:
-			raise ValueError(f'Unknown provider: {provider}')
+	# Use traditional if/elif for broader compatibility instead of match/case
+	if provider == 'openai':
+		kwargs = {'model': config['model_name'], 'temperature': 0.0}
+		# Must set temperatue=1 if model is gpt-o4-mini
+		if model_name == 'gpt-o4-mini':
+			kwargs['temperature'] = 1
+		if api_key:
+			kwargs['api_key'] = api_key
+		return ChatOpenAI(**kwargs)
+	elif provider == 'anthropic':
+		kwargs = {
+			'model': config['model_name'],
+			'temperature': 0.0,
+			'timeout': 100,
+		}
+		if api_key:
+			kwargs['api_key'] = api_key
+		return ChatAnthropic(**kwargs)
+	elif provider == 'google':
+		kwargs = {'model': config['model_name'], 'temperature': 0.0}
+		if api_key:
+			kwargs['api_key'] = api_key
+		return ChatGoogle(**kwargs)
+	elif provider == 'openai_compatible':
+		kwargs = {'model': config['model_name'], 'base_url': config.get('base_url'), 'temperature': 0.0}
+		if api_key:
+			kwargs['api_key'] = api_key
+		elif config.get('base_url'):
+			logger.warning(
+				f'API key for {model_name} at {config.get("base_url")} is missing, but base_url is specified. Authentication may fail.'
+			)
+		return ChatOpenAI(**kwargs)
+	else:
+		raise ValueError(f'Unknown provider: {provider}')
 
 
 def clean_action_dict(action_dict: dict) -> dict:

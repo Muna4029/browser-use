@@ -5,7 +5,7 @@ import logging
 import re
 from collections.abc import Callable
 from inspect import Parameter, iscoroutinefunction, signature
-from typing import Any, Generic, Optional, TypeVar, Union, get_args, get_origin
+from typing import Any, Generic, TypeVar, Union, get_args, get_origin
 
 from pydantic import BaseModel, Field, RootModel, create_model
 
@@ -243,7 +243,9 @@ class Registry(Generic[Context]):
 				return await asyncio.to_thread(func, *call_args)
 
 		# Update wrapper signature to be kwargs-only
-		new_params = [Parameter('params', Parameter.KEYWORD_ONLY, default=None, annotation=Optional[param_model])]
+		# Use BaseModel | None as a stable annotation instead of Optional[param_model]
+		# and pass a tuple to signature.replace to avoid dynamic-list typing issues
+		new_params = [Parameter('params', Parameter.KEYWORD_ONLY, default=None, annotation=BaseModel | None)]
 
 		# Add special params as keyword-only
 		for sp in special_params:
@@ -252,7 +254,7 @@ class Registry(Generic[Context]):
 		# Add **kwargs to accept and ignore extra params
 		new_params.append(Parameter('kwargs', Parameter.VAR_KEYWORD))
 
-		normalized_wrapper.__signature__ = sig.replace(parameters=new_params)  # type: ignore[attr-defined]
+		normalized_wrapper.__signature__ = sig.replace(parameters=tuple(new_params))  # type: ignore[attr-defined]
 
 		return normalized_wrapper, param_model
 
@@ -261,11 +263,19 @@ class Registry(Generic[Context]):
 		"""Creates a Pydantic model from function signature"""
 		sig = signature(function)
 		special_param_names = set(SpecialActionParameters.model_fields.keys())
-		params = {
-			name: (param.annotation, ... if param.default == param.empty else param.default)
-			for name, param in sig.parameters.items()
-			if name not in special_param_names
-		}
+		params: dict[str, tuple[type, Any]] = {}
+		for name, param in sig.parameters.items():
+			if name in special_param_names:
+				continue
+			# Normalize annotation: if missing, fall back to str
+			if param.annotation != Parameter.empty and param.annotation != inspect._empty:
+				annotation = param.annotation
+			else:
+				annotation = str
+			# Normalize default: use Ellipsis (...) for required fields
+			default = ... if param.default == Parameter.empty else param.default
+			params[name] = (annotation, default)
+
 		# TODO: make the types here work
 		return create_model(
 			f'{function.__name__}_parameters',
