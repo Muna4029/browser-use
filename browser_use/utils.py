@@ -553,9 +553,13 @@ def handle_llm_error(e: Exception) -> tuple[dict[str, Any], Any | None]:
 	Raises:
 		LLMException: If the error is not a recognized type with failed generation data
 	"""
+	# Safely obtain optional exception classes if they are available in the environment
+	OpenAIBadRequestError = globals().get("OpenAIBadRequestError")
+	GroqBadRequestError = globals().get("GroqBadRequestError")
+
 	# Handle OpenAI BadRequestError with failed_generation
 	if (
-		OpenAIBadRequestError
+		OpenAIBadRequestError is not None
 		and isinstance(e, OpenAIBadRequestError)
 		and hasattr(e, 'body')
 		and e.body  # type: ignore[attr-defined]

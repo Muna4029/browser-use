@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from dotenv import load_dotenv
-from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from pytest_httpserver import HTTPServer
 
@@ -73,7 +72,9 @@ def create_mock_llm(actions=None):
 	Returns:
 		Mock LLM that will return the actions in order, or just a done action if no actions provided.
 	"""
-	llm = AsyncMock(spec=BaseChatModel)
+	# Use a plain MagicMock as the LLM container to avoid attribute/spec enforcement
+	# which can raise AttributeError when tests set custom attributes on the mock.
+	llm = MagicMock()
 	llm.model_name = 'mock-llm'
 	llm._verified_api_keys = True
 	llm._verified_tool_calling_method = 'raw'
