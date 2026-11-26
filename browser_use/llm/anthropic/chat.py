@@ -44,7 +44,7 @@ class ChatAnthropic(BaseChatModel):
 	api_key: str | None = None
 	auth_token: str | None = None
 	base_url: str | httpx.URL | None = None
-	timeout: float | Timeout | None | NotGiven = NotGiven()
+	timeout: float | Timeout | None | NotGiven = NOT_GIVEN
 	max_retries: int = 10
 	default_headers: Mapping[str, str] | None = None
 	default_query: Mapping[str, object] | None = None
@@ -70,7 +70,8 @@ class ChatAnthropic(BaseChatModel):
 		# Create client_params dict with non-None values and non-NotGiven values
 		client_params = {}
 		for k, v in base_params.items():
-			if v is not None and v is not NotGiven():
+			# Use the module sentinel NOT_GIVEN for identity checks instead of constructing a new NotGiven()
+			if v is not None and v is not NOT_GIVEN:
 				client_params[k] = v
 
 		return client_params

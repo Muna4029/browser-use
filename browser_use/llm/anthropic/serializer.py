@@ -177,7 +177,10 @@ class AnthropicMessageSerializer:
 		elif isinstance(message, SystemMessage):
 			# Anthropic doesn't have system messages in the messages array
 			# System prompts are passed separately. Convert to user message.
-			return message
+			# Convert the SystemMessage into a user MessageParam so callers get a
+			# consistent return type (MessageParam) rather than the raw SystemMessage.
+			content = AnthropicMessageSerializer._serialize_content(getattr(message, 'content', None), use_cache=getattr(message, 'cache', False))
+			return MessageParam(role='user', content=content)
 
 		elif isinstance(message, AssistantMessage):
 			# Handle content and tool calls
@@ -226,8 +229,9 @@ class AnthropicMessageSerializer:
 			else:
 				# Only simplify when no caching and single block
 				single_block = blocks[0]
-				if single_block['type'] == 'text' and not single_block.get('cache_control'):
-					content = single_block['text']
+				# TextBlockParam and ToolUseBlockParam are objects, access attributes
+				if getattr(single_block, 'type', None) == 'text' and not getattr(single_block, 'cache_control', None):
+					content = getattr(single_block, 'text')
 				else:
 					content = blocks
 
@@ -305,8 +309,14 @@ class AnthropicMessageSerializer:
 		# Serialize system message
 		serialized_system_message: list[TextBlockParam] | str | None = None
 		if system_message:
-			serialized_system_message = AnthropicMessageSerializer._serialize_content_to_str(
-				system_message.content, use_cache=system_message.cache
-			)
+			# Guard against pydantic's NotGiven or missing fields by treating unknown
+			# or sentinel values as no system content.
+			content_val = getattr(system_message, 'content', None)
+			if content_val is None or type(content_val).__name__ == 'NotGiven':
+				serialized_system_message = None
+			else:
+				serialized_system_message = AnthropicMessageSerializer._serialize_content_to_str(
+					content_val, use_cache=getattr(system_message, 'cache', False)
+				)
 
 		return serialized_messages, serialized_system_message
