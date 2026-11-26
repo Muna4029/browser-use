@@ -154,25 +154,37 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 	) -> ChatInvokeCompletion[T] | ChatInvokeCompletion[str]:
 		anthropic_messages, system_prompt = AnthropicMessageSerializer.serialize_messages(messages)
 
+		# Build system kw only if present to avoid passing sentinel values that violate client typing
+		system_kw: dict[str, str] = {"system": system_prompt} if system_prompt is not None else {}
+
 		try:
 			if output_format is None:
 				# Normal completion without structured output
 				response = await self.get_client().messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
+					**system_kw,
 					**self._get_client_params_for_invoke(),
 				)
 
 				usage = self._get_usage(response)
 
-				# Extract text from the first content block
-				first_content = response.content[0]
-				if isinstance(first_content, TextBlock):
-					response_text = first_content.text
-				else:
-					# If it's not a text block, convert to string
-					response_text = str(first_content)
+				# Robustly extract text from the response content blocks
+				response_text = ""
+				content_list = getattr(response, "content", None) or []
+				if isinstance(content_list, list) and content_list:
+					for block in content_list:
+						# Prefer explicit text attribute if present
+						text_val = getattr(block, "text", None)
+						if isinstance(text_val, str):
+							response_text = text_val
+							break
+						# If block itself is a string-like value
+						if isinstance(block, str):
+							response_text = block
+							break
+					# Fallback to string conversion
+					response_text = response_text or str(content_list[0])
 
 				return ChatInvokeCompletion(
 					completion=response_text,
@@ -203,28 +215,30 @@ class ChatAnthropicBedrock(ChatAWSBedrock):
 					model=self.model,
 					messages=anthropic_messages,
 					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
 					tool_choice=tool_choice,
+					**system_kw,
 					**self._get_client_params_for_invoke(),
 				)
 
 				usage = self._get_usage(response)
 
-				# Extract the tool use block
-				for content_block in response.content:
-					if hasattr(content_block, 'type') and content_block.type == 'tool_use':
+				# Extract the tool use block in a type-safe manner
+				for content_block in getattr(response, "content", []) or []:
+					if getattr(content_block, "type", None) == 'tool_use':
+						input_val = getattr(content_block, "input", None)
 						# Parse the tool input as the structured output
 						try:
-							return ChatInvokeCompletion(completion=output_format.model_validate(content_block.input), usage=usage)
-						except Exception as e:
+							return ChatInvokeCompletion(completion=output_format.model_validate(input_val), usage=usage)
+						except Exception:
 							# If validation fails, try to parse it as JSON first
-							if isinstance(content_block.input, str):
-								data = json.loads(content_block.input)
-								return ChatInvokeCompletion(
-									completion=output_format.model_validate(data),
-									usage=usage,
-								)
-							raise e
+							if isinstance(input_val, str):
+								try:
+									data = json.loads(input_val)
+									return ChatInvokeCompletion(
+										completion=output_format.model_validate(data),
+										usage=usage,
+									)
+								raise
 
 				# If no tool use block found, raise an error
 				raise ValueError('Expected tool use in response but none found')

@@ -181,7 +181,8 @@ class AnthropicMessageSerializer:
 
 		elif isinstance(message, AssistantMessage):
 			# Handle content and tool calls
-			blocks: list[TextBlockParam | ToolUseBlockParam] = []
+			# Keep blocks as text/image blocks only to satisfy Anthropic MessageParam types
+			blocks: list[TextBlockParam] = []
 
 			# Add content blocks if present
 			if message.content is not None:
@@ -208,7 +209,27 @@ class AnthropicMessageSerializer:
 				tool_blocks = AnthropicMessageSerializer._serialize_tool_calls_to_content(
 					message.tool_calls, use_cache=message.cache
 				)
-				blocks.extend(tool_blocks)
+				# Convert any non-text tool blocks to TextBlockParam to keep content list types homogeneous
+				converted_tool_blocks: list[TextBlockParam] = []
+				for tb in tool_blocks:
+					if isinstance(tb, TextBlockParam):
+						converted_tool_blocks.append(tb)
+					else:
+						# Attempt to extract a textual representation; fall back to str(tb)
+						text_val = getattr(tb, 'text', None)
+						if not isinstance(text_val, str):
+							# try to get a tool name or other identifying attribute
+							text_val = getattr(tb, 'tool', None)
+							if not isinstance(text_val, str):
+								text_val = str(tb)
+						converted_tool_blocks.append(
+							TextBlockParam(
+								text=text_val,
+								type='text',
+								cache_control=AnthropicMessageSerializer._serialize_cache_control(message.cache),
+							)
+					)
+				blocks.extend(converted_tool_blocks)
 
 			# If no content or tool calls, add empty text block
 			# (Anthropic requires at least one content block)
@@ -226,8 +247,12 @@ class AnthropicMessageSerializer:
 			else:
 				# Only simplify when no caching and single block
 				single_block = blocks[0]
-				if single_block['type'] == 'text' and not single_block.get('cache_control'):
-					content = single_block['text']
+				blk_type = getattr(single_block, 'type', None)
+				blk_cache = getattr(single_block, 'cache_control', None)
+				blk_text = getattr(single_block, 'text', None)
+				# Only produce string when block is textual and has no cache control and text is a str
+				if blk_type == 'text' and not blk_cache and isinstance(blk_text, str):
+					content = blk_text
 				else:
 					content = blocks
 

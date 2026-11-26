@@ -67,10 +67,11 @@ class ChatAnthropic(BaseChatModel):
 			'default_query': self.default_query,
 		}
 
-		# Create client_params dict with non-None values and non-NotGiven values
+		# Create client_params dict with non-None values and excluding sentinel NOT_GIVEN
 		client_params = {}
 		for k, v in base_params.items():
-			if v is not None and v is not NotGiven():
+			# Compare against the module-level NOT_GIVEN sentinel, not by constructing a new NotGiven()
+			if v is not None and v is not NOT_GIVEN:
 				client_params[k] = v
 
 		return client_params
@@ -128,24 +129,38 @@ class ChatAnthropic(BaseChatModel):
 		anthropic_messages, system_prompt = AnthropicMessageSerializer.serialize_messages(messages)
 
 		try:
+			client = self.get_client()
+			base_kwargs = self._get_client_params_for_invoke()
+
 			if output_format is None:
 				# Normal completion without structured output
-				response = await self.get_client().messages.create(
+				invoke_kwargs = dict(base_kwargs)
+				# Only include system if we actually have a system prompt; avoid passing NOT_GIVEN sentinel
+				if system_prompt is not None:
+					invoke_kwargs['system'] = system_prompt
+
+				response = await client.messages.create(
 					model=self.model,
 					messages=anthropic_messages,
-					system=system_prompt or NOT_GIVEN,
-					**self._get_client_params_for_invoke(),
+					**invoke_kwargs,
 				)
 
 				usage = self._get_usage(response)
 
-				# Extract text from the first content block
-				first_content = response.content[0]
-				if isinstance(first_content, TextBlock):
-					response_text = first_content.text
-				else:
-					# If it's not a text block, convert to string
-					response_text = str(first_content)
+				# Safely extract the first text-like content block
+				response_text = ''
+				for block in getattr(response, 'content', []) or []:
+					# Prefer TextBlock if available
+					if isinstance(block, TextBlock):
+						response_text = block.text
+						break
+					# Fallback to attribute access if present
+					if hasattr(block, 'text'):
+						response_text = getattr(block, 'text')
+						break
+					# Final fallback to string representation
+					response_text = str(block)
+					break
 
 				return ChatInvokeCompletion(
 					completion=response_text,
@@ -172,31 +187,39 @@ class ChatAnthropic(BaseChatModel):
 				# Force the model to use this tool
 				tool_choice = ToolChoiceToolParam(type='tool', name=tool_name)
 
-				response = await self.get_client().messages.create(
+				invoke_kwargs = dict(base_kwargs)
+				if system_prompt is not None:
+					invoke_kwargs['system'] = system_prompt
+
+				response = await client.messages.create(
 					model=self.model,
 					messages=anthropic_messages,
 					tools=[tool],
-					system=system_prompt or NOT_GIVEN,
 					tool_choice=tool_choice,
-					**self._get_client_params_for_invoke(),
+					**invoke_kwargs,
 				)
 
 				usage = self._get_usage(response)
 
-				# Extract the tool use block
-				for content_block in response.content:
-					if hasattr(content_block, 'type') and content_block.type == 'tool_use':
+				# Extract the tool use block safely from the content union
+				for content_block in getattr(response, 'content', []) or []:
+					btype = getattr(content_block, 'type', None)
+					if btype == 'tool_use':
 						# Parse the tool input as the structured output
+						input_val = getattr(content_block, 'input', None)
 						try:
-							return ChatInvokeCompletion(completion=output_format.model_validate(content_block.input), usage=usage)
+							# If input is a JSON string, try to load it first, otherwise pass through
+							if isinstance(input_val, str):
+								try:
+									data = json.loads(input_val)
+								except Exception:
+									data = input_val
+							else:
+								data = input_val
+
+							return ChatInvokeCompletion(completion=output_format.model_validate(data), usage=usage)
 						except Exception as e:
-							# If validation fails, try to parse it as JSON first
-							if isinstance(content_block.input, str):
-								data = json.loads(content_block.input)
-								return ChatInvokeCompletion(
-									completion=output_format.model_validate(data),
-									usage=usage,
-								)
+							# Propagate structured validation errors
 							raise e
 
 				# If no tool use block found, raise an error
