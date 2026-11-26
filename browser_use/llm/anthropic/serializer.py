@@ -2,23 +2,22 @@ import json
 from typing import overload
 
 from anthropic.types import (
-	Base64ImageSourceParam,
-	CacheControlEphemeralParam,
-	ImageBlockParam,
-	MessageParam,
-	TextBlockParam,
-	ToolUseBlockParam,
-	URLImageSourceParam,
+    Base64ImageSourceParam,
+    CacheControlEphemeralParam,
+    ImageBlockParam,
+    MessageParam,
+    TextBlockParam,
+    ToolUseBlockParam,
+    URLImageSourceParam,
 )
 
 from browser_use.llm.messages import (
-	AssistantMessage,
-	BaseMessage,
-	ContentPartImageParam,
-	ContentPartTextParam,
-	SupportedImageMediaType,
-	SystemMessage,
-	UserMessage,
+    AssistantMessage,
+    BaseMessage,
+    ContentPartImageParam,
+    ContentPartTextParam,
+    SystemMessage,
+    UserMessage,
 )
 
 NonSystemMessage = UserMessage | AssistantMessage
@@ -33,7 +32,7 @@ class AnthropicMessageSerializer:
 		return url.startswith('data:image/')
 
 	@staticmethod
-	def _parse_base64_url(url: str) -> tuple[SupportedImageMediaType, str]:
+	def _parse_base64_url(url: str) -> tuple[str, str]:
 		"""Parse a base64 data URL to extract media type and data."""
 		# Format: data:image/jpeg;base64,<data>
 		if not url.startswith('data:'):
@@ -48,7 +47,7 @@ class AnthropicMessageSerializer:
 			# Default to png if not recognized
 			media_type = 'image/png'
 
-		return media_type, data  # type: ignore
+		return media_type, data
 
 	@staticmethod
 	def _serialize_cache_control(use_cache: bool) -> CacheControlEphemeralParam | None:
@@ -226,8 +225,9 @@ class AnthropicMessageSerializer:
 			else:
 				# Only simplify when no caching and single block
 				single_block = blocks[0]
-				if single_block['type'] == 'text' and not single_block.get('cache_control'):
-					content = single_block['text']
+				# Use attribute access on typed block objects instead of mapping access
+				if getattr(single_block, 'type', None) == 'text' and not getattr(single_block, 'cache_control', None):
+					content = getattr(single_block, 'text')
 				else:
 					content = blocks
 
