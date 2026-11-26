@@ -529,7 +529,7 @@ def match_url_with_domain_pattern(url: str, domain_pattern: str, log_warnings: b
 		return False
 
 
-def merge_dicts(a: dict, b: dict, path: tuple[str, ...] = ()):
+def merge_dicts(a: dict, b: dict, path: tuple = ()): 
 	for key in b:
 		if key in a:
 			if isinstance(a[key], dict) and isinstance(b[key], dict):
@@ -574,7 +574,7 @@ def get_browser_use_version() -> str:
 		return 'unknown'
 
 
-def _log_pretty_path(path: str | Path | None) -> str:
+def _log_pretty_path(path) -> str:
 	"""Pretty-print a path, shorten home dir to ~ and cwd to ."""
 
 	if not path or not str(path).strip():
